@@ -1,0 +1,22 @@
+{
+  "name": "syncra-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Syncra SaaS OTP Verification",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "seed": "node src/scripts/seed.js",
+    "kill": "taskkill /F /IM node.exe"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "date-fns": "^4.4.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "geolib": "^3.3.14",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.4.1",
+    "nodemailer": "^6.9.13"
+  }
+}

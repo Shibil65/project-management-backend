@@ -1,0 +1,2 @@
+DB Connection State: 2
+Database is not connected.
