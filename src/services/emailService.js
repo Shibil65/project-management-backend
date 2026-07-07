@@ -1,5 +1,30 @@
-const { sendEmail, isSmtpConfigured, getMissingSmtpConfig } = require('./email/utils/sendEmail');
+const { sendEmail, isSmtpConfigured, getMissingSmtpConfig, getSafeSmtpConfig, getSmtpErrorDetails } = require('./email/utils/sendEmail');
 
+
+function getOtpMailFailureMessage(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const command = String(error?.command || '').toUpperCase();
+  const response = String(error?.response || error?.message || '');
+  const lowerResponse = response.toLowerCase();
+
+  if (code === 'EAUTH' || lowerResponse.includes('invalid login') || lowerResponse.includes('username and password not accepted')) {
+    return 'Email login failed. Check SMTP_USER and SMTP_PASS. For Gmail, use a Google App Password.';
+  }
+
+  if (code === 'ECONNECTION' || code === 'ETIMEDOUT' || lowerResponse.includes('timeout')) {
+    return 'Email server connection timed out. Check SMTP_HOST, SMTP_PORT, and Render outbound mail access.';
+  }
+
+  if (command === 'CONN' || lowerResponse.includes('connect')) {
+    return 'Could not connect to the email server. Check SMTP_HOST and SMTP_PORT.';
+  }
+
+  if (lowerResponse.includes('self-signed') || lowerResponse.includes('certificate')) {
+    return 'Email TLS certificate check failed. Set SMTP_ALLOW_INVALID_CERTS=true only if your SMTP provider requires it.';
+  }
+
+  return 'Could not send OTP email right now. Please try again shortly.';
+}
 function canUseOtpConsoleFallback() {
   return process.env.NODE_ENV !== 'production' || process.env.OTP_CONSOLE_FALLBACK === 'true';
 }
@@ -14,6 +39,8 @@ function escapeHtml(value = '') {
 }
 
 async function sendEmailOtp(email, otp) {
+  console.log('[MAIL] OTP send requested:', { to: email, smtp: getSafeSmtpConfig() });
+
   if (!isSmtpConfigured()) {
     const missing = getMissingSmtpConfig();
     console.error('[MAIL] OTP email cannot be sent. Missing SMTP config: ' + missing.join(', '));
@@ -55,7 +82,8 @@ async function sendEmailOtp(email, otp) {
 
     return { success: true, message: 'OTP has been dispatched to your email address.', debugMockOtp: null };
   } catch (mailError) {
-    console.error('Nodemailer failed to dispatch mail:', mailError.message);
+    const details = getSmtpErrorDetails(mailError);
+    console.error('[MAIL] OTP send failed:', details);
     if (canUseOtpConsoleFallback()) {
       return {
         success: true,
@@ -66,7 +94,8 @@ async function sendEmailOtp(email, otp) {
 
     return {
       success: false,
-      message: 'Could not send OTP email right now. Please try again shortly.'
+      message: process.env.NODE_ENV === 'production' ? 'OTP email service is temporarily unavailable. Please contact support.' : getOtpMailFailureMessage(mailError),
+      error: process.env.NODE_ENV === 'production' ? undefined : details
     };
   }
 }

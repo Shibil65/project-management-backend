@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Company = require('../models/Company');
 const { otpStore, fallbackUsers, fallbackCompanies } = require('../utils/fallbackStore');
 const { sendEmailOtp } = require('../services/emailService');
+const { getSafeSmtpConfig, verifySmtpConnection } = require('../services/email/utils/sendEmail');
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -18,10 +19,50 @@ function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+async function mailHealth(req, res) {
+  const config = getSafeSmtpConfig();
+
+  if (!config.configured) {
+    return res.status(503).json({
+      success: false,
+      message: 'SMTP is not configured.',
+      smtp: config,
+    });
+  }
+
+  try {
+    const verified = await verifySmtpConnection();
+    return res.status(200).json({
+      success: true,
+      message: 'SMTP connection verified.',
+      smtp: verified,
+    });
+  } catch (err) {
+    console.error('[MAIL] SMTP health check failed:', {
+      message: err.message,
+      code: err.code,
+      command: err.command,
+      response: err.response,
+    });
+
+    return res.status(503).json({
+      success: false,
+      message: 'SMTP connection failed. Check Render logs for the exact mail provider error.',
+      smtp: config,
+      error: {
+        message: err.message,
+        code: err.code || null,
+        command: err.command || null,
+      },
+    });
+  }
+}
 async function sendOtp(req, res) {
+  console.log('[OTP] send-otp request received:', { bodyKeys: Object.keys(req.body || {}), hasEmail: Boolean(req.body?.email) });
   const { email } = req.body;
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail || !normalizedEmail.includes('@')) {
+    console.warn('[OTP] Invalid email supplied for send-otp.');
     return res.status(400).json({ success: false, message: 'Invalid email address.' });
   }
 
@@ -35,15 +76,19 @@ async function sendOtp(req, res) {
         { otp, expiresAt: new Date(expires) },
         { upsert: true, new: true }
       );
+      console.log('[OTP] OTP stored in MongoDB:', { email: normalizedEmail, expiresAt: new Date(expires).toISOString() });
     } catch (err) {
-      console.error('Failed to store OTP in MongoDB:', err.message);
+      console.error('[OTP] Failed to store OTP in MongoDB:', { message: err.message, code: err.code });
       otpStore.set(normalizedEmail, { otp, expires });
     }
   } else {
     otpStore.set(normalizedEmail, { otp, expires });
+    console.warn('[OTP] MongoDB not connected. OTP stored in fallback memory store:', { email: normalizedEmail });
   }
 
+  console.log('[OTP] Dispatching OTP email:', { email: normalizedEmail });
   const result = await sendEmailOtp(normalizedEmail, otp);
+  console.log('[OTP] OTP email dispatch result:', { email: normalizedEmail, success: result.success, message: result.message });
 
   if (result.debugMockOtp) {
     console.log('\n--- [OTP SECURITY SERVICE] ---');
@@ -197,4 +242,5 @@ async function verifyOtp(req, res) {
 module.exports = {
   sendOtp,
   verifyOtp,
+  mailHealth,
 };

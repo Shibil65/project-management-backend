@@ -3,6 +3,7 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const { validateRequiredFields } = require('../validators/requestValidator');
 
+router.get('/mail-health', authController.mailHealth);
 router.post('/send-otp', validateRequiredFields(['email']), authController.sendOtp);
 router.post('/verify-otp', validateRequiredFields(['email', 'otp']), authController.verifyOtp);
 

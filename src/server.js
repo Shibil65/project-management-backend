@@ -1,6 +1,7 @@
 require('dotenv').config();
 const app = require('./app');
 const { connectDB } = require('./config/db');
+const { logMailStartupStatus } = require('./services/email/utils/sendEmail');
 
 const PORT = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
@@ -106,8 +107,17 @@ async function initializeDatabase() {
   }
 }
 
+
+async function initializeMail() {
+  try {
+    await logMailStartupStatus();
+  } catch (err) {
+    console.error('[MAIL] Startup mail diagnostics failed unexpectedly:', err.message);
+  }
+}
 async function startServer() {
   await initializeDatabase();
+  await initializeMail();
 
   const server = app.listen(PORT, () => {
     console.log('=========================================');
