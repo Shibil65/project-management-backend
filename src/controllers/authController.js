@@ -43,14 +43,17 @@ async function sendOtp(req, res) {
     otpStore.set(normalizedEmail, { otp, expires });
   }
 
-  console.log('\n--- [OTP SECURITY SERVICE] ---');
-  console.log(`Email: ${normalizedEmail}`);
-  console.log(`Generated OTP: ${otp}`);
-  console.log('Expires: 5 Minutes');
-  console.log('-----------------------------\n');
-
   const result = await sendEmailOtp(normalizedEmail, otp);
-  return res.status(200).json(result);
+
+  if (result.debugMockOtp) {
+    console.log('\n--- [OTP SECURITY SERVICE] ---');
+    console.log(`Email: ${normalizedEmail}`);
+    console.log(`Generated OTP: ${otp}`);
+    console.log('Expires: 5 Minutes');
+    console.log('-----------------------------\n');
+  }
+
+  return res.status(result.success ? 200 : 503).json(result);
 }
 
 async function resolveLoginUser(email) {

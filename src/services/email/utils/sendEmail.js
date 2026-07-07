@@ -6,6 +6,7 @@ function getSmtpConfig(allowInvalidCerts = process.env.SMTP_ALLOW_INVALID_CERTS 
   const smtpUser = process.env.SMTP_USER;
   const defaultFromName = process.env.MAIL_FROM_NAME || 'Syncra';
   const defaultFrom = process.env.MAIL_FROM || (smtpUser ? `"${defaultFromName}" <${smtpUser}>` : undefined);
+  const timeoutMs = parseInt(process.env.SMTP_TIMEOUT_MS || '8000', 10);
 
   return {
     smtpPort,
@@ -21,6 +22,9 @@ function getSmtpConfig(allowInvalidCerts = process.env.SMTP_ALLOW_INVALID_CERTS 
       },
       requireTLS: smtpPort !== 465,
       tls: allowInvalidCerts ? { rejectUnauthorized: false } : undefined,
+      connectionTimeout: timeoutMs,
+      greetingTimeout: timeoutMs,
+      socketTimeout: timeoutMs,
     }
   };
 }

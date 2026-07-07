@@ -13,6 +13,20 @@ const {
   sendWelcomeCompanyEmail
 } = require("../../services/email/emailService");
 
+function queueWelcomeCompanyEmail(adminEmail, companyName, adminName, selectedPlan) {
+  sendWelcomeCompanyEmail(adminEmail, companyName, adminName, selectedPlan)
+    .then((result) => {
+      if (result.emailSent) {
+        console.log(`[createCompany] Welcome email queued successfully for ${adminEmail}`);
+      } else {
+        console.warn(`[createCompany] Welcome email was not sent for ${adminEmail}: ${result.error || 'unknown mail error'}`);
+      }
+    })
+    .catch((err) => {
+      console.error(`[createCompany] Welcome email failed for ${adminEmail}:`, err.message);
+    });
+}
+
 function deriveAdminName(email) {
   const localPart = String(email || "admin").split("@")[0] || "admin";
   return localPart
@@ -140,19 +154,13 @@ async function createCompany(req, res) {
       });
       await newPayment.save();
 
-      let emailSent = false;
-      try {
-        const emailResult = await sendWelcomeCompanyEmail(adminEmail, name, adminName, selectedPlan);
-        emailSent = emailResult.emailSent;
-      } catch (err) {
-        console.error("Welcome email failed:", err);
-      }
+      queueWelcomeCompanyEmail(adminEmail, name, adminName, selectedPlan);
 
       return res.status(201).json({
         success: true,
         data: newCompany,
         admin: newAdminUser,
-        emailSent
+        emailQueued: true
       });
     } catch (err) {
       console.error("Failed to create company in MongoDB:", err.message);
@@ -225,19 +233,13 @@ async function createCompany(req, res) {
     })
   };
   fallbackPayments.push(newPayment);
-  let emailSent = false;
-  try {
-    const emailResult = await sendWelcomeCompanyEmail(adminEmail, name, adminName, selectedPlan);
-    emailSent = emailResult.emailSent;
-  } catch (err) {
-    console.error("Welcome email failed in fallback store:", err);
-  }
+  queueWelcomeCompanyEmail(adminEmail, name, adminName, selectedPlan);
 
   return res.status(201).json({
     success: true,
     data: newCompany,
     admin: newAdminUser,
-    emailSent
+    emailQueued: true
   });
 }
 

@@ -13,6 +13,20 @@ const {
   sendWelcomeCompanyEmail
 } = require("../../services/email/emailService");
 
+function queueWelcomeCompanyEmail(adminEmail, companyName, adminName, selectedPlan) {
+  sendWelcomeCompanyEmail(adminEmail, companyName, adminName, selectedPlan)
+    .then((result) => {
+      if (result.emailSent) {
+        console.log(`[registerCompany] Welcome email queued successfully for ${adminEmail}`);
+      } else {
+        console.warn(`[registerCompany] Welcome email was not sent for ${adminEmail}: ${result.error || 'unknown mail error'}`);
+      }
+    })
+    .catch((err) => {
+      console.error(`[registerCompany] Welcome email failed for ${adminEmail}:`, err.message);
+    });
+}
+
 async function registerCompany(req, res) {
   console.log('[registerCompany] Request body:', { ...req.body, logo: req.body.logo ? '(base64)' : '' });
 
@@ -142,13 +156,7 @@ async function registerCompany(req, res) {
         })
       });
       await newPayment.save();
-      let emailSent = false;
-      try {
-        const emailResult = await sendWelcomeCompanyEmail(adminEmail.toLowerCase(), name, adminName, selectedPlan);
-        emailSent = emailResult.emailSent;
-      } catch (err) {
-        console.error("Welcome email failed:", err);
-      }
+      queueWelcomeCompanyEmail(adminEmail.toLowerCase(), name, adminName, selectedPlan);
       return res.status(201).json({
         success: true,
         message: "Company workspace and billing details successfully created.",
@@ -156,7 +164,7 @@ async function registerCompany(req, res) {
           company: newCompany,
           admin: newAdminUser
         },
-        emailSent
+        emailQueued: true
       });
     } catch (err) {
       console.error("[registerCompany] Database error:", err.message, err.code, err.keyValue);
@@ -232,13 +240,7 @@ async function registerCompany(req, res) {
     })
   };
   fallbackPayments.push(newPayment);
-  let emailSent = false;
-  try {
-    const emailResult = await sendWelcomeCompanyEmail(adminEmail.toLowerCase(), name, adminName, selectedPlan);
-    emailSent = emailResult.emailSent;
-  } catch (err) {
-    console.error("Welcome email failed in fallback store:", err);
-  }
+  queueWelcomeCompanyEmail(adminEmail.toLowerCase(), name, adminName, selectedPlan);
   return res.status(201).json({
     success: true,
     message: "Company workspace and billing details successfully created in fallback store.",
@@ -246,7 +248,7 @@ async function registerCompany(req, res) {
       company: newCompany,
       admin: newAdminUser
     },
-    emailSent
+    emailQueued: true
   });
 }
 

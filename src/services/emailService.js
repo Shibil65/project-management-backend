@@ -4,6 +4,10 @@ function isSmtpConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 }
 
+function canUseOtpConsoleFallback() {
+  return process.env.NODE_ENV !== 'production' || process.env.OTP_CONSOLE_FALLBACK === 'true';
+}
+
 function escapeHtml(value = '') {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -15,7 +19,11 @@ function escapeHtml(value = '') {
 
 async function sendEmailOtp(email, otp) {
   if (!isSmtpConfigured()) {
-    return { success: false, message: 'SMTP not configured in .env. OTP logged to console.', debugMockOtp: otp };
+    if (canUseOtpConsoleFallback()) {
+      return { success: true, message: 'SMTP not configured. OTP logged to server console.', debugMockOtp: otp };
+    }
+
+    return { success: false, message: 'Email service is not configured. Please contact support.' };
   }
 
   try {
@@ -50,10 +58,17 @@ async function sendEmailOtp(email, otp) {
     return { success: true, message: 'OTP has been dispatched to your email address.', debugMockOtp: null };
   } catch (mailError) {
     console.error('Nodemailer failed to dispatch mail:', mailError.message);
+    if (canUseOtpConsoleFallback()) {
+      return {
+        success: true,
+        message: 'Mail server issue. Developer fallback: OTP printed to server console.',
+        debugMockOtp: otp
+      };
+    }
+
     return {
-      success: true,
-      message: 'Mail server issue. (Developer Mode Fallback: OTP printed to system console.)',
-      debugMockOtp: otp
+      success: false,
+      message: 'Could not send OTP email right now. Please try again shortly.'
     };
   }
 }
