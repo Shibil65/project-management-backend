@@ -1,5 +1,6 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
+const https = require('https');
 
 function getEnvValue(names) {
   for (const name of names) {
@@ -92,7 +93,22 @@ function isCertificateChainError(err) {
   return message.includes('self-signed certificate') || message.includes('certificate chain');
 }
 
+function getResendApiKey() {
+  return getEnvValue(['RESEND_API_KEY']);
+}
+
+function getSendGridApiKey() {
+  return getEnvValue(['SENDGRID_API_KEY']);
+}
+
+function isEmailApiConfigured() {
+  return !!(getResendApiKey() || getSendGridApiKey());
+}
+
 function getMissingSmtpConfig() {
+  if (isEmailApiConfigured()) {
+    return [];
+  }
   const config = getSmtpConfig();
   return [
     !config.smtpHost ? 'SMTP_HOST' : null,
@@ -108,17 +124,21 @@ function isSmtpConfigured() {
 
 function assertSmtpConfigured() {
   const missing = getMissingSmtpConfig();
-  if (missing.length) {
-    throw new Error(`SMTP is not configured. Missing: ${missing.join(', ')}`);
+  if (missing.length && !isEmailApiConfigured()) {
+    throw new Error(`SMTP/API is not configured. Missing: ${missing.join(', ')}`);
   }
 }
 
 function getSafeSmtpConfig() {
   const config = getSmtpConfig();
   const missing = getMissingSmtpConfig();
+  const hasResend = !!getResendApiKey();
+  const hasSendGrid = !!getSendGridApiKey();
+  
   return {
-    configured: missing.length === 0,
+    configured: missing.length === 0 || hasResend || hasSendGrid,
     missing,
+    provider: hasResend ? 'Resend API' : (hasSendGrid ? 'SendGrid API' : 'SMTP'),
     host: config.smtpHost || null,
     port: config.smtpPort || null,
     secure: config.secure,
@@ -130,6 +150,9 @@ function getSafeSmtpConfig() {
 }
 
 async function verifySmtpConnection() {
+  if (isEmailApiConfigured()) {
+    return getSafeSmtpConfig();
+  }
   assertSmtpConfigured();
   await createTransporter().verify();
   return getSafeSmtpConfig();
@@ -137,21 +160,26 @@ async function verifySmtpConnection() {
 
 function getSmtpErrorDetails(err) {
   return {
-    message: err?.message || 'Unknown SMTP error',
+    message: err?.message || 'Unknown email error',
     code: err?.code || null,
     command: err?.command || null,
     response: err?.response || null,
-    responseCode: err?.responseCode || null,
+    responseCode: err?.responseCode || err?.statusCode || null,
   };
 }
 
 async function logMailStartupStatus() {
   const config = getSafeSmtpConfig();
-  console.log('[MAIL] SMTP config availability:', config);
+  console.log('[MAIL] Email service availability:', config);
 
   if (!config.configured) {
-    console.warn('[MAIL] SMTP verification skipped. Missing: ' + config.missing.join(', '));
+    console.warn('[MAIL] Email service verification skipped. Missing: ' + config.missing.join(', '));
     return { success: false, config };
+  }
+
+  if (isEmailApiConfigured()) {
+    console.log(`[MAIL] Running with HTTP API provider: ${config.provider}`);
+    return { success: true, config };
   }
 
   if (process.env.SMTP_VERIFY_ON_STARTUP === 'false') {
@@ -183,15 +211,197 @@ async function sendWithRetry(mailOptions) {
   }
 }
 
+function parseEmailString(emailStr) {
+  if (!emailStr) return { email: '', name: '' };
+  const cleanStr = String(emailStr).trim();
+  const angleBracketIndex = cleanStr.indexOf('<');
+  if (angleBracketIndex !== -1) {
+    const name = cleanStr.substring(0, angleBracketIndex).replace(/"/g, '').trim();
+    const email = cleanStr.substring(angleBracketIndex + 1, cleanStr.length - 1).trim();
+    return { name, email };
+  }
+  return { name: '', email: cleanStr };
+}
+
+function makeHttpsPost(urlStr, headers, bodyObj) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlStr);
+    const bodyString = JSON.stringify(bodyObj);
+    
+    const options = {
+      method: 'POST',
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(bodyString),
+        ...headers
+      }
+    };
+    
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        let parsed = null;
+        try {
+          parsed = data ? JSON.parse(data) : {};
+        } catch (e) {
+          parsed = { rawResponse: data };
+        }
+        
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve({ statusCode: res.statusCode, body: parsed });
+        } else {
+          let errorMsg = '';
+          if (parsed && typeof parsed === 'object') {
+            if (Array.isArray(parsed.errors) && parsed.errors.length > 0 && parsed.errors[0].message) {
+              errorMsg = parsed.errors[0].message;
+            } else if (parsed.message) {
+              errorMsg = parsed.message;
+            } else if (parsed.error) {
+              errorMsg = typeof parsed.error === 'object' ? (parsed.error.message || JSON.stringify(parsed.error)) : parsed.error;
+            }
+          }
+          if (!errorMsg) {
+            errorMsg = `HTTP error ${res.statusCode}`;
+          }
+          
+          const err = new Error(errorMsg);
+          err.statusCode = res.statusCode;
+          err.response = parsed;
+          err.code = `HTTP_${res.statusCode}`;
+          reject(err);
+        }
+      });
+    });
+    
+    req.on('error', (err) => {
+      reject(err);
+    });
+    
+    req.write(bodyString);
+    req.end();
+  });
+}
+
+async function sendViaResend({ to, subject, html, text, from, replyTo }) {
+  const apiKey = getResendApiKey();
+  const finalFrom = from || 'onboarding@resend.dev';
+  
+  const payload = {
+    from: finalFrom,
+    to: typeof to === 'string' ? to.split(',').map(e => e.trim()) : to,
+    subject: subject,
+    html: html,
+    text: text
+  };
+
+  if (replyTo) {
+    payload.headers = {
+      'Reply-To': replyTo
+    };
+  }
+
+  try {
+    const res = await makeHttpsPost(
+      'https://api.resend.com/emails',
+      {
+        'Authorization': `Bearer ${apiKey}`,
+        'User-Agent': 'syncra-backend/1.0'
+      },
+      payload
+    );
+    return res.body;
+  } catch (err) {
+    console.error('[MAIL] Resend API error details:', err.response || err.message);
+    throw err;
+  }
+}
+
+async function sendViaSendGrid({ to, subject, html, text, from, replyTo }) {
+  const apiKey = getSendGridApiKey();
+  const parsedFrom = parseEmailString(from || 'no-reply@syncra.com');
+  const toEmails = typeof to === 'string' ? to.split(',').map(e => e.trim()) : to;
+  
+  const payload = {
+    personalizations: [
+      {
+        to: toEmails.map(email => ({ email }))
+      }
+    ],
+    from: {
+      email: parsedFrom.email,
+      ...(parsedFrom.name ? { name: parsedFrom.name } : {})
+    },
+    subject: subject,
+    content: [
+      {
+        type: 'text/html',
+        value: html
+      }
+    ]
+  };
+
+  if (text) {
+    payload.content.unshift({
+      type: 'text/plain',
+      value: text
+    });
+  }
+
+  if (replyTo) {
+    const parsedReplyTo = parseEmailString(replyTo);
+    payload.reply_to = {
+      email: parsedReplyTo.email,
+      ...(parsedReplyTo.name ? { name: parsedReplyTo.name } : {})
+    };
+  }
+
+  try {
+    const res = await makeHttpsPost(
+      'https://api.sendgrid.com/v3/mail/send',
+      {
+        'Authorization': `Bearer ${apiKey}`,
+        'User-Agent': 'syncra-backend/1.0'
+      },
+      payload
+    );
+    return res.body;
+  } catch (err) {
+    console.error('[MAIL] SendGrid API error details:', err.response || err.message);
+    throw err;
+  }
+}
+
 async function sendEmail({ to, subject, html, text, from, replyTo, headers }) {
+  const resendApiKey = getResendApiKey();
+  const sendGridApiKey = getSendGridApiKey();
   const { smtpUser, defaultFrom } = getSmtpConfig();
+
+  const finalFrom = from || defaultFrom;
+  const finalText = text || htmlToText(html);
+
+  if (resendApiKey) {
+    console.log('[MAIL] Sending email via Resend API to:', to);
+    return await sendViaResend({ to, subject, html, text: finalText, from: finalFrom, replyTo });
+  }
+
+  if (sendGridApiKey) {
+    console.log('[MAIL] Sending email via SendGrid API to:', to);
+    return await sendViaSendGrid({ to, subject, html, text: finalText, from: finalFrom, replyTo });
+  }
+
+  // Fallback to SMTP
   const mailOptions = {
-    from: from || defaultFrom,
+    from: finalFrom,
     sender: smtpUser,
     replyTo: replyTo || smtpUser,
     to,
     subject,
-    text: text || htmlToText(html),
+    text: finalText,
     html,
     headers: {
       'X-Auto-Response-Suppress': 'OOF, AutoReply',

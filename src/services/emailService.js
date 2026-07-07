@@ -7,6 +7,19 @@ function getOtpMailFailureMessage(error) {
   const response = String(error?.response || error?.message || '');
   const lowerResponse = response.toLowerCase();
 
+  if (code.startsWith('HTTP_')) {
+    if (code === 'HTTP_401') {
+      return 'Email API authorization failed. Check your API key (RESEND_API_KEY or SENDGRID_API_KEY).';
+    }
+    if (code === 'HTTP_403') {
+      return 'Email API access forbidden. Ensure your sender domain is verified in your provider settings.';
+    }
+    if (code === 'HTTP_422' || lowerResponse.includes('verify') || lowerResponse.includes('unverified') || lowerResponse.includes('domain')) {
+      return 'Sender domain is not verified. If using Resend sandbox, the sender must be onboarding@resend.dev and the recipient must be the account creator.';
+    }
+    return `Email API call failed (${code}): ${error.message}`;
+  }
+
   if (code === 'EAUTH' || lowerResponse.includes('invalid login') || lowerResponse.includes('username and password not accepted')) {
     return 'Email login failed. Check SMTP_USER and SMTP_PASS. For Gmail, use a Google App Password.';
   }
