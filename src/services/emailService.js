@@ -1,8 +1,4 @@
-const { sendEmail } = require('./email/utils/sendEmail');
-
-function isSmtpConfigured() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
-}
+const { sendEmail, isSmtpConfigured, getMissingSmtpConfig } = require('./email/utils/sendEmail');
 
 function canUseOtpConsoleFallback() {
   return process.env.NODE_ENV !== 'production' || process.env.OTP_CONSOLE_FALLBACK === 'true';
@@ -19,6 +15,8 @@ function escapeHtml(value = '') {
 
 async function sendEmailOtp(email, otp) {
   if (!isSmtpConfigured()) {
+    const missing = getMissingSmtpConfig();
+    console.error('[MAIL] OTP email cannot be sent. Missing SMTP config: ' + missing.join(', '));
     if (canUseOtpConsoleFallback()) {
       return { success: true, message: 'SMTP not configured. OTP logged to server console.', debugMockOtp: otp };
     }
@@ -75,6 +73,8 @@ async function sendEmailOtp(email, otp) {
 
 async function sendWelcomeEmail(adminEmail, adminName, companyName) {
   if (!isSmtpConfigured()) {
+    const missing = getMissingSmtpConfig();
+    console.warn('[MAIL] Welcome email not sent. Missing SMTP config: ' + missing.join(', '));
     console.log('\n--- [WELCOME EMAIL] ---');
     console.log(`To: ${adminEmail}`);
     console.log(`Company: ${companyName}`);
@@ -125,6 +125,8 @@ async function sendWelcomeEmail(adminEmail, adminName, companyName) {
 
 async function sendEmployeeInviteEmail(email, name, role, portalUrl, tempPassword, companyEmail, companyName) {
   if (!isSmtpConfigured()) {
+    const missing = getMissingSmtpConfig();
+    console.warn('[MAIL] Invite email not sent. Missing SMTP config: ' + missing.join(', '));
     console.log('\n--- [EMPLOYEE INVITE EMAIL LOG] ---');
     console.log(`From Company: ${companyName} <${companyEmail}>`);
     console.log(`To: ${email}`);
@@ -166,7 +168,7 @@ async function sendEmployeeInviteEmail(email, name, role, portalUrl, tempPasswor
       subject: 'Syncra workspace invitation',
       text: `Hi ${name || 'Team member'}, you have been added to ${companyName || 'your Syncra workspace'} as ${role || 'Employee'}. Portal: ${portalUrl}. Login email: ${email}. Temporary password: ${tempPassword}. Please change your password after logging in.`,
       html,
-      replyTo: companyEmail || process.env.SMTP_USER
+      replyTo: companyEmail
     });
 
     return { success: true, message: 'Invite email sent successfully.' };

@@ -1,9 +1,19 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 
+function getEnvValue(names) {
+  for (const name of names) {
+    if (process.env[name]) return process.env[name];
+  }
+  return undefined;
+}
+
 function getSmtpConfig(allowInvalidCerts = process.env.SMTP_ALLOW_INVALID_CERTS === 'true') {
-  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
-  const smtpUser = process.env.SMTP_USER;
+  const smtpUser = getEnvValue(['SMTP_USER', 'SMTP_USERNAME', 'EMAIL_USER', 'EMAIL_USERNAME', 'GMAIL_USER', 'MAIL_USER']);
+  const smtpPass = getEnvValue(['SMTP_PASS', 'SMTP_PASSWORD', 'EMAIL_PASS', 'EMAIL_PASSWORD', 'GMAIL_PASS', 'GMAIL_APP_PASSWORD', 'MAIL_PASS']);
+  const smtpHost = getEnvValue(['SMTP_HOST', 'EMAIL_HOST', 'MAIL_HOST'])
+    || (smtpUser && smtpUser.endsWith('@gmail.com') ? 'smtp.gmail.com' : undefined);
+  const smtpPort = parseInt(getEnvValue(['SMTP_PORT', 'EMAIL_PORT', 'MAIL_PORT']) || (smtpHost === 'smtp.gmail.com' ? '465' : '587'), 10);
   const defaultFromName = process.env.MAIL_FROM_NAME || 'Syncra';
   const defaultFrom = process.env.MAIL_FROM || (smtpUser ? `"${defaultFromName}" <${smtpUser}>` : undefined);
   const timeoutMs = parseInt(process.env.SMTP_TIMEOUT_MS || '8000', 10);
@@ -11,14 +21,16 @@ function getSmtpConfig(allowInvalidCerts = process.env.SMTP_ALLOW_INVALID_CERTS 
   return {
     smtpPort,
     smtpUser,
+    smtpHost,
+    smtpPass,
     defaultFrom,
     transport: {
-      host: process.env.SMTP_HOST,
+      host: smtpHost,
       port: smtpPort,
       secure: smtpPort === 465,
       auth: {
         user: smtpUser,
-        pass: process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s+/g, '') : undefined,
+        pass: smtpPass ? smtpPass.replace(/\s+/g, '') : undefined,
       },
       requireTLS: smtpPort !== 465,
       tls: allowInvalidCerts ? { rejectUnauthorized: false } : undefined,
@@ -28,7 +40,6 @@ function getSmtpConfig(allowInvalidCerts = process.env.SMTP_ALLOW_INVALID_CERTS 
     }
   };
 }
-
 function createTransporter(allowInvalidCerts) {
   return nodemailer.createTransport(getSmtpConfig(allowInvalidCerts).transport);
 }
@@ -59,12 +70,24 @@ function isCertificateChainError(err) {
 }
 
 function assertSmtpConfigured() {
-  const missing = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'].filter((key) => !process.env[key]);
+  const missing = getMissingSmtpConfig();
   if (missing.length) {
     throw new Error(`SMTP is not configured. Missing: ${missing.join(', ')}`);
   }
 }
 
+function getMissingSmtpConfig() {
+  const config = getSmtpConfig();
+  return [
+    !config.smtpHost ? 'SMTP_HOST' : null,
+    !config.smtpUser ? 'SMTP_USER' : null,
+    !config.smtpPass ? 'SMTP_PASS' : null,
+  ].filter(Boolean);
+}
+
+function isSmtpConfigured() {
+  return getMissingSmtpConfig().length === 0;
+}
 async function sendWithRetry(mailOptions) {
   assertSmtpConfigured();
   try {
@@ -113,5 +136,8 @@ module.exports = {
   transporter,
   createTransporter,
   sendEmail,
-  htmlToText
+  htmlToText,
+  getSmtpConfig,
+  getMissingSmtpConfig,
+  isSmtpConfigured
 };
