@@ -289,8 +289,20 @@ function makeHttpsPost(urlStr, headers, bodyObj) {
 
 async function sendViaResend({ to, subject, html, text, from, replyTo }) {
   const apiKey = getResendApiKey();
-  const finalFrom = from || 'onboarding@resend.dev';
-  
+  const parsedFrom = parseEmailString(from || 'onboarding@resend.dev');
+
+  // Resend free tier/sandbox only allows sending from onboarding@resend.dev
+  // if the sender is a free public email (like Gmail).
+  const publicDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'live.com', 'icloud.com', 'zoho.com'];
+  const domain = parsedFrom.email.split('@')[1]?.toLowerCase();
+
+  let senderEmail = parsedFrom.email;
+  if (publicDomains.includes(domain) || !domain) {
+    senderEmail = 'onboarding@resend.dev';
+  }
+
+  const finalFrom = parsedFrom.name ? `"${parsedFrom.name}" <${senderEmail}>` : senderEmail;
+
   const payload = {
     from: finalFrom,
     to: typeof to === 'string' ? to.split(',').map(e => e.trim()) : to,
@@ -299,10 +311,10 @@ async function sendViaResend({ to, subject, html, text, from, replyTo }) {
     text: text
   };
 
-  if (replyTo) {
-    payload.headers = {
-      'Reply-To': replyTo
-    };
+  if (senderEmail === 'onboarding@resend.dev' && parsedFrom.email && parsedFrom.email !== 'onboarding@resend.dev') {
+    payload.replyTo = replyTo || parsedFrom.email;
+  } else if (replyTo) {
+    payload.replyTo = replyTo;
   }
 
   try {
