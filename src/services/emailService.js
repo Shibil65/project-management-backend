@@ -33,7 +33,8 @@ function getOtpMailFailureMessage(error) {
 }
 
 function canUseOtpConsoleFallback() {
-  return process.env.NODE_ENV !== 'production' || process.env.OTP_CONSOLE_FALLBACK === 'true';
+  // Allow console fallback by default on SMTP failures, unless explicitly disabled with OTP_CONSOLE_FALLBACK=false
+  return process.env.OTP_CONSOLE_FALLBACK !== 'false';
 }
 
 function escapeHtml(value = '') {
