@@ -155,12 +155,14 @@ async function sendOtp(req, res) {
   const result = await sendEmailOtp(normalizedEmail, otp);
   console.log('[OTP] OTP email dispatch result:', { email: normalizedEmail, success: result.success, message: result.message });
 
-  if (result.debugMockOtp) {
-    console.log('\n--- [OTP SECURITY SERVICE] ---');
-    console.log(`Email: ${normalizedEmail}`);
-    console.log(`Generated OTP: ${otp}`);
-    console.log('Expires: 10 Minutes');
-    console.log('-----------------------------\n');
+  // Always print the OTP to the console in local development so the developer can log in even if SMTP times out!
+  if (process.env.NODE_ENV !== 'production' || result.debugMockOtp) {
+    console.log('\n=========================================');
+    console.log('[DEVELOPMENT OTP BYPASS LOG]');
+    console.log(`Email:          ${normalizedEmail}`);
+    console.log(`Generated OTP:  ${otp}`);
+    console.log('Expires in:     10 Minutes (Hashed in DB)');
+    console.log('=========================================\n');
   }
 
   return res.status(result.success ? 200 : 503).json(result);
