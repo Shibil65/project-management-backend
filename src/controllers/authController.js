@@ -19,12 +19,21 @@ function normalizeId(value) {
 
 async function mailHealth(req, res) {
   const config = getSafeSmtpConfig();
+  const providerLabel = config.provider === 'api' ? 'Brevo API' : 'SMTP';
 
   if (!config.configured) {
     return res.status(503).json({
       success: false,
-      message: 'SMTP is not configured.',
-      smtp: config,
+      message: `${providerLabel} is not configured.`,
+      mail: config,
+    });
+  }
+
+  if (config.provider === 'api') {
+    return res.status(200).json({
+      success: true,
+      message: 'Brevo API mail configuration is present.',
+      mail: config,
     });
   }
 
@@ -34,6 +43,7 @@ async function mailHealth(req, res) {
       success: true,
       message: 'SMTP connection verified.',
       smtp: verified,
+      mail: config,
     });
   } catch (err) {
     console.error('[MAIL] SMTP health check failed:', {
@@ -46,7 +56,7 @@ async function mailHealth(req, res) {
     return res.status(503).json({
       success: false,
       message: 'SMTP connection failed. Check logs for the exact error.',
-      smtp: config,
+      mail: config,
       error: {
         message: err.message,
         code: err.code || null,
@@ -55,7 +65,6 @@ async function mailHealth(req, res) {
     });
   }
 }
-
 async function sendOtp(req, res) {
   console.log('[OTP] send-otp request received:', { bodyKeys: Object.keys(req.body || {}), hasEmail: Boolean(req.body?.email) });
   const { email } = req.body;
@@ -115,6 +124,14 @@ async function sendOtp(req, res) {
   const expires = Date.now() + expiryMs;
   const hashedOtp = await bcrypt.hash(otp, 10);
 
+  console.log('[OTP] Dispatching OTP email:', { email: normalizedEmail });
+  const result = await sendEmailOtp(normalizedEmail, otp);
+  console.log('[OTP] OTP email dispatch result:', { email: normalizedEmail, success: result.success, message: result.message });
+
+  if (!result.success) {
+    return res.status(503).json(result);
+  }
+
   if (getIsConnected()) {
     try {
       await OtpCode.findOneAndUpdate(
@@ -131,7 +148,6 @@ async function sendOtp(req, res) {
       console.log('[OTP] OTP stored in MongoDB:', { email: normalizedEmail, expiresAt: new Date(expires).toISOString() });
     } catch (err) {
       console.error('[OTP] Failed to store OTP in MongoDB:', { message: err.message, code: err.code });
-      // In-memory fallback
       otpStore.set(normalizedEmail, {
         otp: hashedOtp,
         expires,
@@ -151,11 +167,7 @@ async function sendOtp(req, res) {
     console.warn('[OTP] MongoDB not connected. OTP stored in fallback memory store:', { email: normalizedEmail });
   }
 
-  console.log('[OTP] Dispatching OTP email:', { email: normalizedEmail });
-  const result = await sendEmailOtp(normalizedEmail, otp);
-  console.log('[OTP] OTP email dispatch result:', { email: normalizedEmail, success: result.success, message: result.message });
-
-  // Always print the OTP to the console in local development so the developer can log in even if SMTP times out!
+  // Always print the OTP to the console in local development so the developer can log in even if SMTP times out.
   if (process.env.NODE_ENV !== 'production' || result.debugMockOtp) {
     console.log('\n=========================================');
     console.log('[DEVELOPMENT OTP BYPASS LOG]');
@@ -165,9 +177,8 @@ async function sendOtp(req, res) {
     console.log('=========================================\n');
   }
 
-  return res.status(result.success ? 200 : 503).json(result);
+  return res.status(200).json(result);
 }
-
 async function resolveLoginUser(email) {
   let matchedUser = null;
   let matchedCompany = null;

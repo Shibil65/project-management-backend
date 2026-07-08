@@ -61,11 +61,17 @@ async function verifySmtpConnection() {
 }
 
 function getSafeSmtpConfig() {
+  const smtpConfigured = isSmtpConfigured();
+  const apiConfigured = !!(mailConfig.api.key && mailConfig.api.senderEmail);
+
   return {
     provider: mailConfig.provider,
+    configured: mailConfig.provider === 'api' ? apiConfigured : smtpConfigured,
     smtpHost: mailConfig.smtp.host,
     smtpPort: mailConfig.smtp.port,
-    fromEmail: mailConfig.smtp.fromEmail
+    smtpUser: mailConfig.smtp.user,
+    smtpFromEmail: mailConfig.smtp.fromEmail,
+    apiSenderEmail: mailConfig.api.senderEmail
   };
 }
 
