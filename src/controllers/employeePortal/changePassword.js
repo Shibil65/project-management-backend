@@ -80,7 +80,8 @@ async function changePassword(req, res) {
     const hashed = await bcrypt.hash(newPassword, 10);
     if (getIsConnected()) {
       await User.findByIdAndUpdate(userId, {
-        password: hashed
+        password: hashed,
+        mustChangePassword: false
       });
       const UserModel = getTenantModel(companyId, "User");
       const {
@@ -88,12 +89,16 @@ async function changePassword(req, res) {
       } = await resolveEmployeeUser(companyId, userId, email, UserModel);
       if (employeeUser) {
         await UserModel.findByIdAndUpdate(employeeUser._id, {
-          password: hashed
+          password: hashed,
+          mustChangePassword: false
         });
       }
     } else {
       const fbUser = resolveFallbackUser(userId, email);
-      if (fbUser) fbUser.password = hashed;
+      if (fbUser) {
+        fbUser.password = hashed;
+        fbUser.mustChangePassword = false;
+      }
     }
     return res.status(200).json({
       success: true,

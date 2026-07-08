@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { getIsConnected } = require('../config/db');
 const OtpCode = require('../models/OtpCode');
 const User = require('../models/User');
@@ -6,6 +7,7 @@ const Company = require('../models/Company');
 const { otpStore, fallbackUsers, fallbackCompanies } = require('../utils/fallbackStore');
 const { sendEmailOtp } = require('../services/emailService');
 const { getSafeSmtpConfig, verifySmtpConnection } = require('../services/email/utils/sendEmail');
+const generateOtp = require('../utils/generateOtp');
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -13,10 +15,6 @@ function normalizeEmail(email) {
 
 function normalizeId(value) {
   return value ? String(value) : '';
-}
-
-function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 async function mailHealth(req, res) {
@@ -47,7 +45,7 @@ async function mailHealth(req, res) {
 
     return res.status(503).json({
       success: false,
-      message: 'SMTP connection failed. Check Render logs for the exact mail provider error.',
+      message: 'SMTP connection failed. Check logs for the exact error.',
       smtp: config,
       error: {
         message: err.message,
@@ -57,6 +55,7 @@ async function mailHealth(req, res) {
     });
   }
 }
+
 async function sendOtp(req, res) {
   console.log('[OTP] send-otp request received:', { bodyKeys: Object.keys(req.body || {}), hasEmail: Boolean(req.body?.email) });
   const { email } = req.body;
@@ -66,23 +65,89 @@ async function sendOtp(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid email address.' });
   }
 
-  const otp = generateOTP();
-  const expires = Date.now() + 5 * 60 * 1000;
+  const cooldownMs = 60 * 1000;
+  const expiryMs = 10 * 60 * 1000; // 10 minutes
+
+  // Check existing OTP details for locks and cooldowns
+  if (getIsConnected()) {
+    try {
+      const existing = await OtpCode.findOne({ email: normalizedEmail });
+      if (existing) {
+        if (existing.lockedUntil && existing.lockedUntil > Date.now()) {
+          const waitMin = Math.ceil((existing.lockedUntil.getTime() - Date.now()) / (60 * 1000));
+          return res.status(429).json({
+            success: false,
+            message: `Too many failed attempts. This email is locked. Please try again in ${waitMin} minute(s).`
+          });
+        }
+        if (existing.lastSentAt && Date.now() - existing.lastSentAt.getTime() < cooldownMs) {
+          const waitSec = Math.ceil((cooldownMs - (Date.now() - existing.lastSentAt.getTime())) / 1000);
+          return res.status(429).json({
+            success: false,
+            message: `Please wait ${waitSec} seconds before requesting a new verification code.`
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[OTP] Pre-check failed in MongoDB:', err.message);
+    }
+  } else {
+    const existing = otpStore.get(normalizedEmail);
+    if (existing) {
+      if (existing.lockedUntil && existing.lockedUntil > Date.now()) {
+        const waitMin = Math.ceil((existing.lockedUntil - Date.now()) / (60 * 1000));
+        return res.status(429).json({
+          success: false,
+          message: `Too many failed attempts. This email is locked. Please try again in ${waitMin} minute(s).`
+        });
+      }
+      if (existing.lastSentAt && Date.now() - existing.lastSentAt < cooldownMs) {
+        const waitSec = Math.ceil((cooldownMs - (Date.now() - existing.lastSentAt)) / 1000);
+        return res.status(429).json({
+          success: false,
+          message: `Please wait ${waitSec} seconds before requesting a new verification code.`
+        });
+      }
+    }
+  }
+
+  const otp = generateOtp();
+  const expires = Date.now() + expiryMs;
+  const hashedOtp = await bcrypt.hash(otp, 10);
 
   if (getIsConnected()) {
     try {
       await OtpCode.findOneAndUpdate(
         { email: normalizedEmail },
-        { otp, expiresAt: new Date(expires) },
+        {
+          otp: hashedOtp,
+          expiresAt: new Date(expires),
+          attempts: 0,
+          lockedUntil: null,
+          lastSentAt: new Date()
+        },
         { upsert: true, new: true }
       );
       console.log('[OTP] OTP stored in MongoDB:', { email: normalizedEmail, expiresAt: new Date(expires).toISOString() });
     } catch (err) {
       console.error('[OTP] Failed to store OTP in MongoDB:', { message: err.message, code: err.code });
-      otpStore.set(normalizedEmail, { otp, expires });
+      // In-memory fallback
+      otpStore.set(normalizedEmail, {
+        otp: hashedOtp,
+        expires,
+        attempts: 0,
+        lockedUntil: null,
+        lastSentAt: Date.now()
+      });
     }
   } else {
-    otpStore.set(normalizedEmail, { otp, expires });
+    otpStore.set(normalizedEmail, {
+      otp: hashedOtp,
+      expires,
+      attempts: 0,
+      lockedUntil: null,
+      lastSentAt: Date.now()
+    });
     console.warn('[OTP] MongoDB not connected. OTP stored in fallback memory store:', { email: normalizedEmail });
   }
 
@@ -94,7 +159,7 @@ async function sendOtp(req, res) {
     console.log('\n--- [OTP SECURITY SERVICE] ---');
     console.log(`Email: ${normalizedEmail}`);
     console.log(`Generated OTP: ${otp}`);
-    console.log('Expires: 5 Minutes');
+    console.log('Expires: 10 Minutes');
     console.log('-----------------------------\n');
   }
 
@@ -181,35 +246,110 @@ async function verifyOtp(req, res) {
     return res.status(400).json({ success: false, message: 'Email and OTP code are required.' });
   }
 
-  let isValid = false;
+  let record = null;
+  let isFallback = false;
 
-  if (otp.trim() === '123456') {
-    isValid = true;
-  } else if (getIsConnected()) {
+  if (getIsConnected()) {
     try {
-      const record = await OtpCode.findOne({ email: normalizedEmail });
-      if (record && record.otp === otp.trim()) {
-        isValid = true;
-        await OtpCode.deleteOne({ email: normalizedEmail });
-      }
+      record = await OtpCode.findOne({ email: normalizedEmail });
     } catch (err) {
-      console.error('MongoDB OTP lookup failed:', err.message);
-      const record = otpStore.get(normalizedEmail);
-      if (record && record.otp === otp.trim() && Date.now() <= record.expires) {
-        isValid = true;
-        otpStore.delete(normalizedEmail);
-      }
+      console.error('MongoDB OTP lookup failed, falling back to memory:', err.message);
+      record = otpStore.get(normalizedEmail);
+      isFallback = true;
     }
   } else {
-    const record = otpStore.get(normalizedEmail);
-    if (record && record.otp === otp.trim() && Date.now() <= record.expires) {
-      isValid = true;
+    record = otpStore.get(normalizedEmail);
+    isFallback = true;
+  }
+
+  if (!record) {
+    return res.status(400).json({ success: false, message: 'No OTP requested for this email or it has expired.' });
+  }
+
+  const now = Date.now();
+  const lockedTime = isFallback ? record.lockedUntil : (record.lockedUntil ? record.lockedUntil.getTime() : null);
+  if (lockedTime && lockedTime > now) {
+    const waitMin = Math.ceil((lockedTime - now) / (60 * 1000));
+    return res.status(403).json({
+      success: false,
+      message: `Account temporarily locked due to too many failed attempts. Try again in ${waitMin} minute(s).`
+    });
+  }
+
+  const expiryTime = isFallback ? record.expires : (record.expiresAt ? record.expiresAt.getTime() : null);
+  if (expiryTime && expiryTime < now) {
+    if (isFallback) {
       otpStore.delete(normalizedEmail);
+    } else {
+      await OtpCode.deleteOne({ email: normalizedEmail });
+    }
+    return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new code.' });
+  }
+
+  const inputOtp = otp.trim();
+  const isDevBypass = process.env.NODE_ENV !== 'production' && inputOtp === '123456';
+  const isMatched = isDevBypass || (await bcrypt.compare(inputOtp, record.otp));
+
+  if (!isMatched) {
+    const newAttempts = record.attempts + 1;
+    const maxAttempts = 5;
+    const remaining = maxAttempts - newAttempts;
+
+    if (newAttempts >= maxAttempts) {
+      const lockDuration = 15 * 60 * 1000; // 15 mins
+      const lockUntilDate = new Date(now + lockDuration);
+      
+      if (isFallback) {
+        otpStore.set(normalizedEmail, {
+          ...record,
+          attempts: newAttempts,
+          lockedUntil: now + lockDuration,
+          expires: now + lockDuration // extend TTL memory
+        });
+      } else {
+        await OtpCode.updateOne(
+          { email: normalizedEmail },
+          {
+            $set: {
+              attempts: newAttempts,
+              lockedUntil: lockUntilDate,
+              expiresAt: lockUntilDate // extend TTL index
+            }
+          }
+        );
+      }
+      return res.status(429).json({
+        success: false,
+        message: 'Too many failed attempts. Your account has been locked for 15 minutes.'
+      });
+    } else {
+      if (isFallback) {
+        otpStore.set(normalizedEmail, {
+          ...record,
+          attempts: newAttempts
+        });
+      } else {
+        await OtpCode.updateOne(
+          { email: normalizedEmail },
+          { $set: { attempts: newAttempts } }
+        );
+      }
+      return res.status(400).json({
+        success: false,
+        message: `Incorrect OTP. ${remaining} attempts remaining.`
+      });
     }
   }
 
-  if (!isValid) {
-    return res.status(400).json({ success: false, message: 'Incorrect or expired OTP code. Please try again.' });
+  // Correct OTP! Clear the record
+  if (isFallback) {
+    otpStore.delete(normalizedEmail);
+  } else {
+    try {
+      await OtpCode.deleteOne({ email: normalizedEmail });
+    } catch (err) {
+      console.error('Failed to delete OTP record from MongoDB:', err.message);
+    }
   }
 
   let loginUser;

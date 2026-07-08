@@ -9,7 +9,8 @@ const { fallbackUsers, fallbackCompanies } = require("../../utils/fallbackStore"
 const { sendEmployeeCredentialsEmail } = require("../../services/email/emailService");
 const { resolvePlanDetails, getFallbackPlanDetails } = require("../../utils/planResolver");
 const { getEmployeePortalUrl } = require("../../utils/frontendUrl");
-const { validatePassword, generateStrongPassword } = require("../../utils/passwordPolicy");
+const { validatePassword } = require("../../utils/passwordPolicy");
+const generateTemporaryPassword = require("../../utils/generateTemporaryPassword");
 const { updateCompanyEmployeeCount } = require("../../utils/companyHelper");
 
 function toObjectId(value) {
@@ -56,7 +57,7 @@ async function createEmployee(req, res) {
 
   let tempPassword = password ? String(password).trim() : "";
   if (!tempPassword) {
-    tempPassword = generateStrongPassword();
+    tempPassword = generateTemporaryPassword();
   }
 
   const passwordValidation = validatePassword(tempPassword);
@@ -180,7 +181,8 @@ async function createEmployee(req, res) {
           location: location || "",
           avatarColor: existingEmployee.avatarColor || avatarColor,
           status: "Active",
-          portalSetup: false
+          portalSetup: false,
+          mustChangePassword: true
         });
         await systemUser.save();
 
@@ -226,7 +228,8 @@ async function createEmployee(req, res) {
         location: location || "",
         avatarColor,
         status: "Active",
-        portalSetup: false
+        portalSetup: false,
+        mustChangePassword: true
       });
       await systemUser.save();
 
@@ -288,6 +291,7 @@ async function createEmployee(req, res) {
       avatarColor,
       status: "Active",
       portalSetup: false,
+      mustChangePassword: true,
       date: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
     };
     fallbackUsers.push(employee);

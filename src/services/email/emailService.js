@@ -1,6 +1,6 @@
 const { sendEmail } = require('./utils/sendEmail');
 const welcomeCompanyTemplate = require('./templates/welcomeCompanyTemplate');
-const employeeCredentialsTemplate = require('./templates/employeeCredentialsTemplate');
+const employeeInvitationTemplate = require('./templates/employeeInvitationTemplate');
 
 /**
  * Sends a welcome email to the company admin after successful registration.
@@ -43,7 +43,7 @@ async function sendWelcomeCompanyEmail(to, companyName, adminName, planName) {
  */
 async function sendEmployeeCredentialsEmail(to, employeeName, companyName, tempPassword, portalUrl, companyEmail) {
   try {
-    const html = employeeCredentialsTemplate(employeeName, companyName, to, tempPassword, portalUrl);
+    const html = employeeInvitationTemplate(employeeName, companyName, to, tempPassword, portalUrl);
 
     await sendEmail({
       to,

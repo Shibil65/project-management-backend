@@ -1,6 +1,26 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
-const https = require('https');
+
+/**
+ * Deliverability DNS Configuration Guidelines:
+ * To protect your domain reputation and prevent emails from landing in SPAM:
+ * 
+ * 1. SPF (Sender Policy Framework):
+ *    Add a TXT record for your domain:
+ *    - Name: @
+ *    - Value: v=spf1 include:_spf.google.com ~all (Adjust if using a custom server like AWS SES or Mailgun)
+ * 
+ * 2. DKIM (DomainKeys Identified Mail):
+ *    Generate a DKIM key pair via your email administrator console (G Suite, Microsoft 365, etc.), 
+ *    and add the TXT record:
+ *    - Name: google._domainkey (or your provider selector)
+ *    - Value: v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BA... (your public key)
+ * 
+ * 3. DMARC (Domain-based Message Authentication, Reporting, and Conformance):
+ *    Add a TXT record to enforce alignment check results:
+ *    - Name: _dmarc.yourdomain.com
+ *    - Value: v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc-reports@yourdomain.com
+ */
 
 function getEnvValue(names) {
   for (const name of names) {
@@ -24,19 +44,56 @@ function maskEmail(email = '') {
   return `${name.slice(0, 2)}***@${domain}`;
 }
 
+/**
+ * Parse SMTP config from environment variables
+ */
 function getSmtpConfig(allowInvalidCerts = process.env.SMTP_ALLOW_INVALID_CERTS === 'true') {
   const smtpUser = getEnvValue(['SMTP_USER', 'SMTP_USERNAME', 'EMAIL_USER', 'EMAIL_USERNAME', 'GMAIL_USER', 'MAIL_USER']);
   const rawPass = getEnvValue(['SMTP_PASS', 'SMTP_PASSWORD', 'EMAIL_PASS', 'EMAIL_PASSWORD', 'GMAIL_PASS', 'GMAIL_APP_PASSWORD', 'MAIL_PASS']);
   const smtpPass = normalizePassword(rawPass);
+  
   const smtpHost = normalizeHost(
     getEnvValue(['SMTP_HOST', 'EMAIL_HOST', 'MAIL_HOST'])
     || (smtpUser && smtpUser.toLowerCase().endsWith('@gmail.com') ? 'smtp.gmail.com' : undefined)
   );
+  
   const smtpPort = parseInt(getEnvValue(['SMTP_PORT', 'EMAIL_PORT', 'MAIL_PORT']) || '587', 10);
-  const secure = smtpPort === 465;
-  const defaultFromName = getEnvValue(['MAIL_FROM_NAME']) || 'Syncra';
-  const defaultFrom = getEnvValue(['MAIL_FROM']) || (smtpUser ? `"${defaultFromName}" <${smtpUser}>` : undefined);
+  
+  // SMTP_SECURE can be "true" or "false". Default to true if port is 465.
+  const smtpSecureEnv = getEnvValue(['SMTP_SECURE']);
+  const secure = smtpSecureEnv !== undefined ? smtpSecureEnv === 'true' : smtpPort === 465;
+
+  const fromName = getEnvValue(['SMTP_FROM_NAME', 'MAIL_FROM_NAME']) || 'Syncra';
+  const fromEmail = getEnvValue(['SMTP_FROM_EMAIL', 'MAIL_FROM']) || smtpUser;
+  const defaultFrom = fromEmail ? `"${fromName}" <${fromEmail}>` : undefined;
+  
   const timeoutMs = parseInt(getEnvValue(['SMTP_TIMEOUT_MS']) || '10000', 10);
+
+  const transport = {
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+    connectionTimeout: timeoutMs,
+    greetingTimeout: timeoutMs,
+    socketTimeout: timeoutMs,
+  };
+
+  const isGmail = smtpHost === 'smtp.gmail.com' || smtpHost === 'gmail' || (smtpUser && smtpUser.toLowerCase().endsWith('@gmail.com'));
+
+  if (isGmail) {
+    transport.service = 'gmail';
+    // If corporate proxy certificates are blocked, bypass validation locally
+    if (allowInvalidCerts) {
+      transport.tls = { rejectUnauthorized: false };
+    }
+  } else {
+    transport.host = smtpHost;
+    transport.port = smtpPort;
+    transport.secure = secure;
+    transport.requireTLS = !secure;
+    transport.tls = allowInvalidCerts ? { rejectUnauthorized: false } : undefined;
+  }
 
   return {
     smtpPort,
@@ -47,20 +104,7 @@ function getSmtpConfig(allowInvalidCerts = process.env.SMTP_ALLOW_INVALID_CERTS 
     requireTLS: !secure,
     defaultFrom,
     timeoutMs,
-    transport: {
-      host: smtpHost,
-      port: smtpPort,
-      secure,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-      requireTLS: !secure,
-      tls: allowInvalidCerts ? { rejectUnauthorized: false } : undefined,
-      connectionTimeout: timeoutMs,
-      greetingTimeout: timeoutMs,
-      socketTimeout: timeoutMs,
-    }
+    transport
   };
 }
 
@@ -93,29 +137,16 @@ function isCertificateChainError(err) {
   return message.includes('self-signed certificate') || message.includes('certificate chain');
 }
 
-function getResendApiKey() {
-  return getEnvValue(['RESEND_API_KEY']);
-}
-
-function getSendGridApiKey() {
-  return getEnvValue(['SENDGRID_API_KEY']);
-}
-
-function isEmailApiConfigured() {
-  return !!(getResendApiKey() || getSendGridApiKey());
-}
-
 function getMissingSmtpConfig() {
-  if (isEmailApiConfigured()) {
-    return [];
-  }
   const config = getSmtpConfig();
-  return [
-    !config.smtpHost ? 'SMTP_HOST' : null,
-    !config.smtpPort ? 'SMTP_PORT' : null,
-    !config.smtpUser ? 'SMTP_USER' : null,
-    !config.smtpPass ? 'SMTP_PASS' : null,
-  ].filter(Boolean);
+  const required = [
+    { key: 'SMTP_HOST', value: config.smtpHost },
+    { key: 'SMTP_PORT', value: config.smtpPort },
+    { key: 'SMTP_USER', value: config.smtpUser },
+    { key: 'SMTP_PASS', value: config.smtpPass },
+    { key: 'SMTP_FROM_EMAIL', value: process.env.SMTP_FROM_EMAIL || config.smtpUser }
+  ];
+  return required.filter(r => !r.value).map(r => r.key);
 }
 
 function isSmtpConfigured() {
@@ -124,21 +155,19 @@ function isSmtpConfigured() {
 
 function assertSmtpConfigured() {
   const missing = getMissingSmtpConfig();
-  if (missing.length && !isEmailApiConfigured()) {
-    throw new Error(`SMTP/API is not configured. Missing: ${missing.join(', ')}`);
+  if (missing.length) {
+    throw new Error(`SMTP is not configured. Missing environment variables: ${missing.join(', ')}`);
   }
 }
 
 function getSafeSmtpConfig() {
   const config = getSmtpConfig();
   const missing = getMissingSmtpConfig();
-  const hasResend = !!getResendApiKey();
-  const hasSendGrid = !!getSendGridApiKey();
   
   return {
-    configured: missing.length === 0 || hasResend || hasSendGrid,
+    configured: missing.length === 0,
     missing,
-    provider: hasResend ? 'Resend API' : (hasSendGrid ? 'SendGrid API' : 'SMTP'),
+    provider: 'SMTP',
     host: config.smtpHost || null,
     port: config.smtpPort || null,
     secure: config.secure,
@@ -150,9 +179,6 @@ function getSafeSmtpConfig() {
 }
 
 async function verifySmtpConnection() {
-  if (isEmailApiConfigured()) {
-    return getSafeSmtpConfig();
-  }
   assertSmtpConfigured();
   await createTransporter().verify();
   return getSafeSmtpConfig();
@@ -168,18 +194,22 @@ function getSmtpErrorDetails(err) {
   };
 }
 
+/**
+ * Validate configuration and print high-visibility startup diagnostics
+ */
 async function logMailStartupStatus() {
   const config = getSafeSmtpConfig();
-  console.log('[MAIL] Email service availability:', config);
-
-  if (!config.configured) {
-    console.warn('[MAIL] Email service verification skipped. Missing: ' + config.missing.join(', '));
+  const missing = getMissingSmtpConfig();
+  
+  if (missing.length > 0) {
+    console.error('\n=========================================');
+    console.error('[MAIL CONFIG ERROR]: Required email environment variables are missing! Email sending will fail.');
+    for (const m of missing) {
+      console.error(`  - ${m}`);
+    }
+    console.error('Please configure these in your backend .env file (e.g. SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM_EMAIL).');
+    console.error('=========================================\n');
     return { success: false, config };
-  }
-
-  if (isEmailApiConfigured()) {
-    console.log(`[MAIL] Running with HTTP API provider: ${config.provider}`);
-    return { success: true, config };
   }
 
   if (process.env.SMTP_VERIFY_ON_STARTUP === 'false') {
@@ -189,10 +219,10 @@ async function logMailStartupStatus() {
 
   try {
     const verified = await verifySmtpConnection();
-    console.log('[MAIL] SMTP transporter verified:', verified);
+    console.log('[MAIL] SMTP transporter verified successfully:', verified);
     return { success: true, config: verified };
   } catch (err) {
-    console.error('[MAIL] SMTP transporter verification failed:', getSmtpErrorDetails(err));
+    console.error('[MAIL] SMTP transporter verification failed on startup:', getSmtpErrorDetails(err));
     return { success: false, config, error: getSmtpErrorDetails(err) };
   }
 }
@@ -223,190 +253,15 @@ function parseEmailString(emailStr) {
   return { name: '', email: cleanStr };
 }
 
-function makeHttpsPost(urlStr, headers, bodyObj) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(urlStr);
-    const bodyString = JSON.stringify(bodyObj);
-    
-    const options = {
-      method: 'POST',
-      hostname: url.hostname,
-      path: url.pathname + url.search,
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(bodyString),
-        ...headers
-      }
-    };
-    
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      res.on('end', () => {
-        let parsed = null;
-        try {
-          parsed = data ? JSON.parse(data) : {};
-        } catch (e) {
-          parsed = { rawResponse: data };
-        }
-        
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve({ statusCode: res.statusCode, body: parsed });
-        } else {
-          let errorMsg = '';
-          if (parsed && typeof parsed === 'object') {
-            if (Array.isArray(parsed.errors) && parsed.errors.length > 0 && parsed.errors[0].message) {
-              errorMsg = parsed.errors[0].message;
-            } else if (parsed.message) {
-              errorMsg = parsed.message;
-            } else if (parsed.error) {
-              errorMsg = typeof parsed.error === 'object' ? (parsed.error.message || JSON.stringify(parsed.error)) : parsed.error;
-            }
-          }
-          if (!errorMsg) {
-            errorMsg = `HTTP error ${res.statusCode}`;
-          }
-          
-          const err = new Error(errorMsg);
-          err.statusCode = res.statusCode;
-          err.response = parsed;
-          err.code = `HTTP_${res.statusCode}`;
-          reject(err);
-        }
-      });
-    });
-    
-    req.on('error', (err) => {
-      reject(err);
-    });
-    
-    req.write(bodyString);
-    req.end();
-  });
-}
-
-async function sendViaResend({ to, subject, html, text, from, replyTo }) {
-  const apiKey = getResendApiKey();
-  const parsedFrom = parseEmailString(from || 'onboarding@resend.dev');
-
-  // Resend free tier/sandbox only allows sending from onboarding@resend.dev
-  // if the sender is a free public email (like Gmail).
-  const publicDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'live.com', 'icloud.com', 'zoho.com'];
-  const domain = parsedFrom.email.split('@')[1]?.toLowerCase();
-
-  let senderEmail = parsedFrom.email;
-  if (publicDomains.includes(domain) || !domain) {
-    senderEmail = 'onboarding@resend.dev';
-  }
-
-  const finalFrom = parsedFrom.name ? `"${parsedFrom.name}" <${senderEmail}>` : senderEmail;
-
-  const payload = {
-    from: finalFrom,
-    to: typeof to === 'string' ? to.split(',').map(e => e.trim()) : to,
-    subject: subject,
-    html: html,
-    text: text
-  };
-
-  if (senderEmail === 'onboarding@resend.dev' && parsedFrom.email && parsedFrom.email !== 'onboarding@resend.dev') {
-    payload.replyTo = replyTo || parsedFrom.email;
-  } else if (replyTo) {
-    payload.replyTo = replyTo;
-  }
-
-  try {
-    const res = await makeHttpsPost(
-      'https://api.resend.com/emails',
-      {
-        'Authorization': `Bearer ${apiKey}`,
-        'User-Agent': 'syncra-backend/1.0'
-      },
-      payload
-    );
-    return res.body;
-  } catch (err) {
-    console.error('[MAIL] Resend API error details:', err.response || err.message);
-    throw err;
-  }
-}
-
-async function sendViaSendGrid({ to, subject, html, text, from, replyTo }) {
-  const apiKey = getSendGridApiKey();
-  const parsedFrom = parseEmailString(from || 'no-reply@syncra.com');
-  const toEmails = typeof to === 'string' ? to.split(',').map(e => e.trim()) : to;
-  
-  const payload = {
-    personalizations: [
-      {
-        to: toEmails.map(email => ({ email }))
-      }
-    ],
-    from: {
-      email: parsedFrom.email,
-      ...(parsedFrom.name ? { name: parsedFrom.name } : {})
-    },
-    subject: subject,
-    content: [
-      {
-        type: 'text/html',
-        value: html
-      }
-    ]
-  };
-
-  if (text) {
-    payload.content.unshift({
-      type: 'text/plain',
-      value: text
-    });
-  }
-
-  if (replyTo) {
-    const parsedReplyTo = parseEmailString(replyTo);
-    payload.reply_to = {
-      email: parsedReplyTo.email,
-      ...(parsedReplyTo.name ? { name: parsedReplyTo.name } : {})
-    };
-  }
-
-  try {
-    const res = await makeHttpsPost(
-      'https://api.sendgrid.com/v3/mail/send',
-      {
-        'Authorization': `Bearer ${apiKey}`,
-        'User-Agent': 'syncra-backend/1.0'
-      },
-      payload
-    );
-    return res.body;
-  } catch (err) {
-    console.error('[MAIL] SendGrid API error details:', err.response || err.message);
-    throw err;
-  }
-}
-
+/**
+ * Primary interface to send an email. Sets headers to prevent spam blockages.
+ */
 async function sendEmail({ to, subject, html, text, from, replyTo, headers }) {
-  const resendApiKey = getResendApiKey();
-  const sendGridApiKey = getSendGridApiKey();
   const { smtpUser, defaultFrom } = getSmtpConfig();
 
   const finalFrom = from || defaultFrom;
   const finalText = text || htmlToText(html);
 
-  if (resendApiKey) {
-    console.log('[MAIL] Sending email via Resend API to:', to);
-    return await sendViaResend({ to, subject, html, text: finalText, from: finalFrom, replyTo });
-  }
-
-  if (sendGridApiKey) {
-    console.log('[MAIL] Sending email via SendGrid API to:', to);
-    return await sendViaSendGrid({ to, subject, html, text: finalText, from: finalFrom, replyTo });
-  }
-
-  // Fallback to SMTP
   const mailOptions = {
     from: finalFrom,
     sender: smtpUser,
@@ -418,6 +273,7 @@ async function sendEmail({ to, subject, html, text, from, replyTo, headers }) {
     headers: {
       'X-Auto-Response-Suppress': 'OOF, AutoReply',
       'X-Entity-Ref-ID': `syncra-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      'Precedence': 'bulk',
       ...headers
     }
   };

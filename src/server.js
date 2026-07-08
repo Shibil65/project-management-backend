@@ -5,7 +5,7 @@ const { logMailStartupStatus } = require('./services/email/utils/sendEmail');
 
 const PORT = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
-const requireDatabase = isProduction || process.env.REQUIRE_DATABASE === 'true';
+const requireDatabase = process.env.REQUIRE_DATABASE === 'true';
 
 async function runOptionalDatabaseCleanup() {
   if (process.env.ENABLE_DB_AUTO_CLEANUP !== 'true') return;
@@ -108,8 +108,11 @@ async function initializeDatabase() {
 }
 
 
+const { validateConfig } = require('./config/mailConfig');
+
 async function initializeMail() {
   try {
+    validateConfig();
     await logMailStartupStatus();
   } catch (err) {
     console.error('[MAIL] Startup mail diagnostics failed unexpectedly:', err.message);

@@ -21,6 +21,7 @@ const UserSchema = new mongoose.Schema({
   date:       { type: String, default: () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) },
   status:     { type: String, enum: ['Active', 'Suspended'], default: 'Active' },
   portalSetup: { type: Boolean, default: false },       // true once employee has logged into portal
+  mustChangePassword: { type: Boolean, default: false }, // true for newly invited employees
   securityPin: { type: String, default: '123456' },      // 6-digit security PIN for clocking
   attendancePin: { type: String, default: '' },          // bcrypt-hashed PIN
   hasAttendancePin: { type: Boolean, default: false },   // true once security PIN has been updated/hashed

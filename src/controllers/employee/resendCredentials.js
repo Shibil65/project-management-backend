@@ -6,15 +6,7 @@ const Employee = require('../../models/Employee');
 const { fallbackUsers } = require('../../utils/fallbackStore');
 const { sendEmployeeCredentialsEmail } = require('../../services/email/emailService');
 const { getEmployeePortalUrl } = require('../../utils/frontendUrl');
-
-function generateRandomPassword() {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let password = '';
-  for (let i = 0; i < 10; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return password + 'A1!';
-}
+const generateTemporaryPassword = require('../../utils/generateTemporaryPassword');
 
 function sameId(left, right) {
   return left && right && String(left) === String(right);
@@ -34,7 +26,7 @@ async function resendCredentials(req, res) {
   try {
     let name = '';
     let email = '';
-    const tempPassword = generateRandomPassword();
+    const tempPassword = generateTemporaryPassword();
     const hashed = await bcrypt.hash(tempPassword, 10);
 
     if (getIsConnected()) {
@@ -85,7 +77,8 @@ async function resendCredentials(req, res) {
           location: employeeProfile.location || '',
           avatarColor: employeeProfile.avatarColor || '#6366f1',
           status: employeeProfile.status || 'Active',
-          portalSetup: false
+          portalSetup: false,
+          mustChangePassword: true
         });
         await user.save();
         employeeProfile.authUserId = user._id;
@@ -93,6 +86,7 @@ async function resendCredentials(req, res) {
       } else if (user) {
         user.password = hashed;
         user.portalSetup = false;
+        user.mustChangePassword = true;
         await user.save();
       }
 
@@ -110,10 +104,10 @@ async function resendCredentials(req, res) {
       email = user.email;
       user.password = hashed;
       user.portalSetup = false;
+      user.mustChangePassword = true;
     }
 
-    const baseFrontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
-    const portalUrl = `${baseFrontendUrl}/employee-portal`;
+    const portalUrl = getEmployeePortalUrl(req);
     const emailResult = await sendEmployeeCredentialsEmail(email, name, companyName, tempPassword, portalUrl, companyEmail);
 
     if (emailResult.emailSent) {
