@@ -1,7 +1,7 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 const https = require('https');
-const { mailConfig } = require('../../../../config/mailConfig');
+const { mailConfig } = require('../../../config/mailConfig');
 
 function getSmtpConfig(allowInvalidCerts = (process.env.NODE_ENV !== 'production' && process.env.SMTP_ALLOW_INVALID_CERTS === 'true')) {
   const { host, port, secure, user, pass, fromName, fromEmail } = mailConfig.smtp;
