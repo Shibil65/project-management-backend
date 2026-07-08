@@ -1,40 +1,36 @@
 const { sendEmail, isSmtpConfigured, getMissingSmtpConfig, getSafeSmtpConfig, getSmtpErrorDetails } = require('./email/utils/sendEmail');
+const { mailConfig } = require('../config/mailConfig');
 const otpEmailTemplate = require('./email/templates/otpEmailTemplate');
 const employeeInvitationTemplate = require('./email/templates/employeeInvitationTemplate');
 const welcomeCompanyTemplate = require('./email/templates/welcomeCompanyTemplate');
 
 function getOtpMailFailureMessage(error) {
   const code = String(error?.code || '').toUpperCase();
-  const command = String(error?.command || '').toUpperCase();
   const response = String(error?.response || error?.message || '');
   const lowerResponse = response.toLowerCase();
 
-  if (code.startsWith('HTTP_')) {
-    return `Email API call failed (${code}): ${error.message}`;
-  }
-
   if (code === 'EAUTH' || lowerResponse.includes('invalid login') || lowerResponse.includes('username and password not accepted')) {
-    return 'Email login failed. Check SMTP_USER and SMTP_PASS. For Gmail, use a Google App Password.';
+    return 'SMTP credentials are invalid.';
   }
 
-  if (code === 'ECONNECTION' || code === 'ETIMEDOUT' || lowerResponse.includes('timeout')) {
-    return 'Email server connection timed out. Check SMTP_HOST, SMTP_PORT, and Render outbound mail access.';
+  if (code === 'HTTP_401' || lowerResponse.includes('key not found') || lowerResponse.includes('unauthorized') || lowerResponse.includes('401')) {
+    return 'BREVO_API_KEY is missing/invalid or EMAIL_PROVIDER is wrong.';
   }
 
-  if (command === 'CONN' || lowerResponse.includes('connect')) {
-    return 'Could not connect to the email server. Check SMTP_HOST and SMTP_PORT.';
+  if (lowerResponse.includes('unauthorized ip address') || lowerResponse.includes('525')) {
+    return 'Unauthorized IP address. Please authorize your IP in your Brevo SMTP settings.';
   }
 
-  if (lowerResponse.includes('self-signed') || lowerResponse.includes('certificate')) {
-    return 'Email TLS certificate check failed. Set SMTP_ALLOW_INVALID_CERTS=true only if your SMTP provider requires it.';
+  if (lowerResponse.includes('sender') || lowerResponse.includes('from') || lowerResponse.includes('unverified')) {
+    return 'SMTP_FROM_EMAIL is missing or not verified.';
   }
 
   return 'Could not send OTP email right now. Please try again shortly.';
 }
 
 function canUseOtpConsoleFallback() {
-  // Allow console fallback by default on SMTP failures, unless explicitly disabled with OTP_CONSOLE_FALLBACK=false
-  return process.env.OTP_CONSOLE_FALLBACK !== 'false';
+  // Strictly allow console fallback ONLY if NOT in production AND ALLOW_DEV_OTP_BYPASS is explicitly true
+  return process.env.NODE_ENV !== 'production' && mailConfig.allowDevBypass;
 }
 
 function escapeHtml(value = '') {
@@ -49,14 +45,17 @@ function escapeHtml(value = '') {
 async function sendEmailOtp(email, otp) {
   console.log('[MAIL] OTP send requested:', { to: email, smtp: getSafeSmtpConfig() });
 
-  if (!isSmtpConfigured()) {
-    const missing = getMissingSmtpConfig();
-    console.error('[MAIL] OTP email cannot be sent. Missing SMTP config: ' + missing.join(', '));
-    if (canUseOtpConsoleFallback()) {
-      return { success: true, message: 'SMTP not configured. OTP logged to server console.', debugMockOtp: otp };
-    }
+  const isConfigured = mailConfig.provider === 'api' ? !!mailConfig.api.key : isSmtpConfigured();
 
-    return { success: false, message: 'Email service is not configured. Please contact support.' };
+  if (!isConfigured) {
+    console.error('[MAIL] Email service cannot be sent. Incomplete credentials for provider: ' + mailConfig.provider);
+    if (canUseOtpConsoleFallback()) {
+      return { success: true, message: 'SMTP/API not configured. OTP logged to server console.', debugMockOtp: otp };
+    }
+    const errMsg = mailConfig.provider === 'api' 
+      ? 'BREVO_API_KEY is missing/invalid or EMAIL_PROVIDER is wrong.' 
+      : 'SMTP credentials are invalid.';
+    return { success: false, message: errMsg };
   }
 
   try {
@@ -74,6 +73,7 @@ async function sendEmailOtp(email, otp) {
   } catch (mailError) {
     const details = getSmtpErrorDetails(mailError);
     console.error('[MAIL] OTP send failed:', details);
+    
     if (canUseOtpConsoleFallback()) {
       return {
         success: true,
@@ -84,16 +84,16 @@ async function sendEmailOtp(email, otp) {
 
     return {
       success: false,
-      message: process.env.NODE_ENV === 'production' ? 'OTP email service is temporarily unavailable. Please contact support.' : getOtpMailFailureMessage(mailError),
+      message: getOtpMailFailureMessage(mailError),
       error: process.env.NODE_ENV === 'production' ? undefined : details
     };
   }
 }
 
 async function sendWelcomeEmail(adminEmail, adminName, companyName) {
-  if (!isSmtpConfigured()) {
-    const missing = getMissingSmtpConfig();
-    console.warn('[MAIL] Welcome email not sent. Missing SMTP config: ' + missing.join(', '));
+  const isConfigured = mailConfig.provider === 'api' ? !!mailConfig.api.key : isSmtpConfigured();
+  if (!isConfigured) {
+    console.warn('[MAIL] Welcome email not sent. Config missing.');
     console.log('\n--- [WELCOME EMAIL] ---');
     console.log(`To: ${adminEmail}`);
     console.log(`Company: ${companyName}`);
@@ -121,9 +121,9 @@ async function sendWelcomeEmail(adminEmail, adminName, companyName) {
 }
 
 async function sendEmployeeInviteEmail(email, name, role, portalUrl, tempPassword, companyEmail, companyName) {
-  if (!isSmtpConfigured()) {
-    const missing = getMissingSmtpConfig();
-    console.warn('[MAIL] Invite email not sent. Missing SMTP config: ' + missing.join(', '));
+  const isConfigured = mailConfig.provider === 'api' ? !!mailConfig.api.key : isSmtpConfigured();
+  if (!isConfigured) {
+    console.warn('[MAIL] Invite email not sent. Config missing.');
     console.log('\n--- [EMPLOYEE INVITE EMAIL LOG] ---');
     console.log(`From Company: ${companyName} <${companyEmail}>`);
     console.log(`To: ${email}`);
@@ -132,7 +132,7 @@ async function sendEmployeeInviteEmail(email, name, role, portalUrl, tempPasswor
     console.log(`Portal: ${portalUrl}`);
     console.log(`Temp Password: ${tempPassword}`);
     console.log('-----------------------------------\n');
-    return { success: true, message: 'SMTP not configured. Invite logged to console.' };
+    return { success: true, message: 'SMTP/API not configured. Invite logged to console.' };
   }
 
   try {
@@ -149,7 +149,7 @@ async function sendEmployeeInviteEmail(email, name, role, portalUrl, tempPasswor
     return { success: true, message: 'Invite email sent successfully.' };
   } catch (err) {
     console.error('Failed to send invite email:', err.message);
-    return { success: false, message: `Mail server issue: ${err.message}` };
+    return { success: false, message: getOtpMailFailureMessage(err) };
   }
 }
 
