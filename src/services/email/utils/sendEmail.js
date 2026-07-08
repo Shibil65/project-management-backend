@@ -1,5 +1,6 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
+const https = require('https');
 
 /**
  * Deliverability DNS Configuration Guidelines:
@@ -138,6 +139,12 @@ function isCertificateChainError(err) {
 }
 
 function getMissingSmtpConfig() {
+  const provider = getEnvValue(['EMAIL_PROVIDER']) || 'smtp';
+  if (provider === 'api' || provider === 'brevo_api') {
+    const rawPass = getEnvValue(['SMTP_PASS', 'SMTP_PASSWORD', 'EMAIL_PASS', 'EMAIL_PASSWORD', 'GMAIL_PASS', 'GMAIL_APP_PASSWORD', 'MAIL_PASS']);
+    return !rawPass ? ['SMTP_PASS'] : [];
+  }
+
   const config = getSmtpConfig();
   const required = [
     { key: 'SMTP_HOST', value: config.smtpHost },
@@ -156,11 +163,25 @@ function isSmtpConfigured() {
 function assertSmtpConfigured() {
   const missing = getMissingSmtpConfig();
   if (missing.length) {
-    throw new Error(`SMTP is not configured. Missing environment variables: ${missing.join(', ')}`);
+    throw new Error(`Email provider is not configured. Missing environment variables: ${missing.join(', ')}`);
   }
 }
 
 function getSafeSmtpConfig() {
+  const provider = getEnvValue(['EMAIL_PROVIDER']) || 'smtp';
+  if (provider === 'api' || provider === 'brevo_api') {
+    const rawPass = getEnvValue(['SMTP_PASS']);
+    const configured = !!rawPass;
+    return {
+      configured,
+      missing: configured ? [] : ['SMTP_PASS'],
+      provider: 'Brevo API (HTTPS)',
+      host: 'api.brevo.com',
+      port: 443,
+      secure: true
+    };
+  }
+
   const config = getSmtpConfig();
   const missing = getMissingSmtpConfig();
   
@@ -179,6 +200,21 @@ function getSafeSmtpConfig() {
 }
 
 async function verifySmtpConnection() {
+  const provider = getEnvValue(['EMAIL_PROVIDER']) || 'smtp';
+  if (provider === 'api' || provider === 'brevo_api') {
+    const rawPass = getEnvValue(['SMTP_PASS']);
+    if (!rawPass) {
+      throw new Error('API key (SMTP_PASS) is missing.');
+    }
+    return {
+      configured: true,
+      provider: 'Brevo API (HTTPS)',
+      host: 'api.brevo.com',
+      port: 443,
+      secure: true
+    };
+  }
+
   assertSmtpConfigured();
   await createTransporter().verify();
   return getSafeSmtpConfig();
@@ -207,7 +243,7 @@ async function logMailStartupStatus() {
     for (const m of missing) {
       console.error(`  - ${m}`);
     }
-    console.error('Please configure these in your backend .env file (e.g. SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM_EMAIL).');
+    console.error('Please configure these in your backend .env file.');
     console.error('=========================================\n');
     return { success: false, config };
   }
@@ -219,10 +255,10 @@ async function logMailStartupStatus() {
 
   try {
     const verified = await verifySmtpConnection();
-    console.log('[MAIL] SMTP transporter verified successfully:', verified);
+    console.log('[MAIL] Email service verified successfully:', verified);
     return { success: true, config: verified };
   } catch (err) {
-    console.error('[MAIL] SMTP transporter verification failed on startup:', getSmtpErrorDetails(err));
+    console.error('[MAIL] Email service verification failed on startup:', getSmtpErrorDetails(err));
     return { success: false, config, error: getSmtpErrorDetails(err) };
   }
 }
@@ -241,24 +277,118 @@ async function sendWithRetry(mailOptions) {
   }
 }
 
-function parseEmailString(emailStr) {
-  if (!emailStr) return { email: '', name: '' };
-  const cleanStr = String(emailStr).trim();
-  const angleBracketIndex = cleanStr.indexOf('<');
-  if (angleBracketIndex !== -1) {
-    const name = cleanStr.substring(0, angleBracketIndex).replace(/"/g, '').trim();
-    const email = cleanStr.substring(angleBracketIndex + 1, cleanStr.length - 1).trim();
-    return { name, email };
+function makeHttpsPost(urlStr, headers, bodyObj) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlStr);
+    const bodyString = JSON.stringify(bodyObj);
+    
+    const options = {
+      method: 'POST',
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(bodyString),
+        ...headers
+      }
+    };
+    
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        let parsed = null;
+        try {
+          parsed = data ? JSON.parse(data) : {};
+        } catch (e) {
+          parsed = { rawResponse: data };
+        }
+        
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve({ statusCode: res.statusCode, body: parsed });
+        } else {
+          let errorMsg = '';
+          if (parsed && typeof parsed === 'object') {
+            if (Array.isArray(parsed.errors) && parsed.errors.length > 0 && parsed.errors[0].message) {
+              errorMsg = parsed.errors[0].message;
+            } else if (parsed.message) {
+              errorMsg = parsed.message;
+            } else if (parsed.error) {
+              errorMsg = typeof parsed.error === 'object' ? (parsed.error.message || JSON.stringify(parsed.error)) : parsed.error;
+            }
+          }
+          if (!errorMsg) {
+            errorMsg = `HTTP error ${res.statusCode}`;
+          }
+          
+          const err = new Error(errorMsg);
+          err.statusCode = res.statusCode;
+          err.response = parsed;
+          err.code = `HTTP_${res.statusCode}`;
+          reject(err);
+        }
+      });
+    });
+    
+    req.on('error', (err) => {
+      reject(err);
+    });
+    
+    req.write(bodyString);
+    req.end();
+  });
+}
+
+/**
+ * Deliver emails using Brevo transactional HTTP API
+ */
+async function sendViaBrevoApi({ to, subject, html, text, from }) {
+  const config = getSmtpConfig();
+  const apiKey = config.smtpPass;
+  if (!apiKey) {
+    throw new Error('API key (SMTP_PASS) is missing.');
   }
-  return { name: '', email: cleanStr };
+
+  const fromName = getEnvValue(['SMTP_FROM_NAME']) || 'Syncra';
+  const fromEmail = getEnvValue(['SMTP_FROM_EMAIL']) || config.smtpUser;
+
+  const requestBody = {
+    sender: {
+      name: fromName,
+      email: fromEmail
+    },
+    to: [
+      {
+        email: to
+      }
+    ],
+    subject: subject,
+    htmlContent: html,
+    textContent: text || htmlToText(html)
+  };
+
+  const headers = {
+    'accept': 'application/json',
+    'api-key': apiKey,
+    'content-type': 'application/json'
+  };
+
+  return await makeHttpsPost('https://api.brevo.com/v3/smtp/email', headers, requestBody);
 }
 
 /**
  * Primary interface to send an email. Sets headers to prevent spam blockages.
  */
 async function sendEmail({ to, subject, html, text, from, replyTo, headers }) {
-  const { smtpUser, defaultFrom } = getSmtpConfig();
+  const provider = getEnvValue(['EMAIL_PROVIDER']) || 'smtp';
+  
+  if (provider === 'api' || provider === 'brevo_api') {
+    return await sendViaBrevoApi({ to, subject, html, text, from });
+  }
 
+  const { smtpUser, defaultFrom } = getSmtpConfig();
   const finalFrom = from || defaultFrom;
   const finalText = text || htmlToText(html);
 
