@@ -9,16 +9,16 @@ function getOtpMailFailureMessage(error) {
   const response = String(error?.response || error?.message || '');
   const lowerResponse = response.toLowerCase();
 
-  if (code === 'EAUTH' || lowerResponse.includes('invalid login') || lowerResponse.includes('username and password not accepted')) {
-    return 'SMTP credentials are invalid.';
+  if (lowerResponse.includes('unauthorized ip address') || lowerResponse.includes('525')) {
+    return 'Unauthorized IP address. Please authorize your Render outbound IP in your Brevo SMTP settings.';
   }
 
   if (code === 'HTTP_401' || lowerResponse.includes('key not found') || lowerResponse.includes('unauthorized') || lowerResponse.includes('401')) {
     return 'BREVO_API_KEY is missing/invalid or EMAIL_PROVIDER is wrong.';
   }
 
-  if (lowerResponse.includes('unauthorized ip address') || lowerResponse.includes('525')) {
-    return 'Unauthorized IP address. Please authorize your IP in your Brevo SMTP settings.';
+  if (code === 'EAUTH' || lowerResponse.includes('invalid login') || lowerResponse.includes('username and password not accepted')) {
+    return 'SMTP credentials are invalid.';
   }
 
   if (lowerResponse.includes('sender') || lowerResponse.includes('from') || lowerResponse.includes('unverified')) {
