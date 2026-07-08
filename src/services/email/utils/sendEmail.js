@@ -79,7 +79,7 @@ function getSmtpConfig(allowInvalidCerts = process.env.SMTP_ALLOW_INVALID_CERTS 
     socketTimeout: timeoutMs,
   };
 
-  const isGmail = smtpHost === 'smtp.gmail.com' || smtpHost === 'gmail' || (smtpUser && smtpUser.toLowerCase().endsWith('@gmail.com'));
+  const isGmail = smtpHost === 'smtp.gmail.com' || smtpHost === 'gmail';
 
   if (isGmail) {
     transport.service = 'gmail';
