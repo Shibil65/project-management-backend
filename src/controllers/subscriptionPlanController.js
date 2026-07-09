@@ -83,12 +83,13 @@ function checkAndSeedFallbackPlans() {
 async function getActivePlans(req, res) {
   if (getIsConnected()) {
     try {
-      let list = await SubscriptionPlan.find({ isActive: true }).sort({ displayOrder: 1 });
-      if (list.length === 0) {
+      const count = await SubscriptionPlan.countDocuments({});
+      if (count === 0) {
         // Automatically seed default plans if DB empty
         await SubscriptionPlan.insertMany(defaultSeedPlans);
-        list = await SubscriptionPlan.find({ isActive: true }).sort({ displayOrder: 1 });
       }
+      // Query plans where isActive is not false (to support legacy plans without isActive field)
+      const list = await SubscriptionPlan.find({ isActive: { $ne: false } }).sort({ displayOrder: 1 });
       return res.status(200).json({ success: true, data: list });
     } catch (err) {
       console.error('Failed to get active plans:', err);
@@ -105,11 +106,11 @@ async function getActivePlans(req, res) {
 async function getAllPlans(req, res) {
   if (getIsConnected()) {
     try {
-      let list = await SubscriptionPlan.find({}).sort({ displayOrder: 1 });
-      if (list.length === 0) {
+      const count = await SubscriptionPlan.countDocuments({});
+      if (count === 0) {
         await SubscriptionPlan.insertMany(defaultSeedPlans);
-        list = await SubscriptionPlan.find({}).sort({ displayOrder: 1 });
       }
+      const list = await SubscriptionPlan.find({}).sort({ displayOrder: 1 });
       return res.status(200).json({ success: true, data: list });
     } catch (err) {
       console.error('Failed to get all plans:', err);

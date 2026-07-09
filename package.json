@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "seed": "node src/scripts/seed.js",
-    "kill": "taskkill /F /IM node.exe"
+    "kill": "taskkill /F /IM node.exe",
+    "test-query": "node test-query.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
