@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 
 const CompanySchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true },
@@ -18,6 +18,9 @@ const CompanySchema = new mongoose.Schema({
   gpsLatitude: { type: Number, default: null },
   gpsLongitude: { type: Number, default: null },
   gpsRadius: { type: Number, default: 200 },
+  gpsTrackingEnabled: { type: Boolean, default: true },
+  ipTrackingEnabled: { type: Boolean, default: false },
+  allowedPublicIps: { type: [String], default: [] },
   attendancePortalEnabled: { type: Boolean, default: true },
   attendancePortalOpenTime: { type: String, default: '09:00' },
   attendancePortalCloseTime: { type: String, default: '18:00' }
