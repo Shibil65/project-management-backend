@@ -227,10 +227,14 @@ const getSessionStatus = asyncHandler(async (req, res) => {
   const { sessionId } = req.params;
   const companyId = req.user.companyId;
 
+  const mongoose = require('mongoose');
   let session;
   let settings;
 
   if (getIsConnected()) {
+    if (!mongoose.Types.ObjectId.isValid(sessionId) || !mongoose.Types.ObjectId.isValid(companyId)) {
+      return res.status(400).json({ success: false, message: 'Invalid session ID or company ID format.' });
+    }
     session = await AttendanceQrSession.findOne({ _id: sessionId, companyId });
     settings = await AttendanceSettings.findOne({ companyId });
   } else {
@@ -336,8 +340,12 @@ const verifyToken = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: 'QR Attendance is disabled for this company.' });
   }
 
+  const mongoose = require('mongoose');
   let session;
   if (getIsConnected()) {
+    if (!mongoose.Types.ObjectId.isValid(sessionId) || !mongoose.Types.ObjectId.isValid(companyId)) {
+      return res.status(400).json({ success: false, message: 'Invalid session ID or company ID format.' });
+    }
     session = await AttendanceQrSession.findOne({ _id: sessionId, companyId });
   } else {
     session = fallbackAttendanceQrSessions.find(s => s.id === sessionId && s.companyId === companyId);
