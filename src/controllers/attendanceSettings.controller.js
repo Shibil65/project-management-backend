@@ -44,7 +44,7 @@ const getSettings = asyncHandler(async (req, res) => {
 const updateSettings = asyncHandler(async (req, res) => {
   const companyId = req.user.companyId;
   const email = req.user.email;
-  const { qrAttendanceEnabled, qrExpiresInMinutes, requireAdminPortalHeartbeat } = req.body;
+  const { qrAttendanceEnabled, qrExpiresInMinutes, requireAdminPortalHeartbeat, heartbeatTimeoutSeconds } = req.body;
 
   if (getIsConnected()) {
     let settings = await AttendanceSettings.findOne({ companyId });
@@ -55,6 +55,7 @@ const updateSettings = asyncHandler(async (req, res) => {
     if (qrAttendanceEnabled !== undefined) settings.qrAttendanceEnabled = !!qrAttendanceEnabled;
     if (qrExpiresInMinutes !== undefined) settings.qrExpiresInMinutes = Number(qrExpiresInMinutes);
     if (requireAdminPortalHeartbeat !== undefined) settings.requireAdminPortalHeartbeat = !!requireAdminPortalHeartbeat;
+    if (heartbeatTimeoutSeconds !== undefined) settings.heartbeatTimeoutSeconds = Number(heartbeatTimeoutSeconds);
     settings.updatedBy = email;
 
     await settings.save();
@@ -71,6 +72,7 @@ const updateSettings = asyncHandler(async (req, res) => {
   if (qrAttendanceEnabled !== undefined) settings.qrAttendanceEnabled = !!qrAttendanceEnabled;
   if (qrExpiresInMinutes !== undefined) settings.qrExpiresInMinutes = Number(qrExpiresInMinutes);
   if (requireAdminPortalHeartbeat !== undefined) settings.requireAdminPortalHeartbeat = !!requireAdminPortalHeartbeat;
+  if (heartbeatTimeoutSeconds !== undefined) settings.heartbeatTimeoutSeconds = Number(heartbeatTimeoutSeconds);
   settings.updatedBy = email;
   settings.updatedAt = new Date();
 

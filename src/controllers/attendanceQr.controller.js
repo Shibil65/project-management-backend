@@ -172,7 +172,8 @@ const getSessionStatus = asyncHandler(async (req, res) => {
   // Heartbeat timeout check (30 seconds)
   const requireHeartbeat = settings ? settings.requireAdminPortalHeartbeat : true;
   const heartbeatDiff = now - new Date(session.lastHeartbeatAt).getTime();
-  if (isActive && status === 'active' && requireHeartbeat && heartbeatDiff > 30000) {
+  const timeoutMs = ((settings ? settings.heartbeatTimeoutSeconds : 30) || 30) * 1000;
+  if (isActive && status === 'active' && requireHeartbeat && heartbeatDiff > timeoutMs) {
     isActive = false;
     status = 'expired';
     session.isActive = false;
@@ -255,7 +256,8 @@ const verifyToken = asyncHandler(async (req, res) => {
 
   const requireHeartbeat = settings.requireAdminPortalHeartbeat;
   const heartbeatDiff = now - new Date(session.lastHeartbeatAt).getTime();
-  if (isActive && status === 'active' && requireHeartbeat && heartbeatDiff > 30000) {
+  const timeoutMs = (settings.heartbeatTimeoutSeconds || 30) * 1000;
+  if (isActive && status === 'active' && requireHeartbeat && heartbeatDiff > timeoutMs) {
     isActive = false;
     status = 'expired';
     session.isActive = false;
