@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const SubscriptionPlan = require('./SubscriptionPlan');
+const SubscriptionPackage = require('./subscriptionPackage.model');
 
-// Export SubscriptionPlan model registered as 'Plan' for backward compatibility
-module.exports = mongoose.models.Plan || mongoose.model('Plan', SubscriptionPlan.schema);
+// Export SubscriptionPackage model registered as 'Plan' for backward compatibility
+module.exports = mongoose.models.Plan || mongoose.model('Plan', SubscriptionPackage.schema);
