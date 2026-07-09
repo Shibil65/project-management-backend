@@ -20,7 +20,7 @@ const attendanceQrService = {
         settings = new AttendanceSettings({
           companyId,
           qrAttendanceEnabled: true,
-          qrExpiresInMinutes: 5,
+          qrExpiresInMinutes: 30,
           requireAdminPortalHeartbeat: true,
           createdBy: adminEmail
         });
@@ -34,7 +34,7 @@ const attendanceQrService = {
           id: `fb_as_${Date.now()}`,
           companyId,
           qrAttendanceEnabled: true,
-          qrExpiresInMinutes: 5,
+          qrExpiresInMinutes: 30,
           requireAdminPortalHeartbeat: true,
           createdBy: adminEmail
         };
@@ -58,7 +58,7 @@ const attendanceQrService = {
           id: `fb_as_${Date.now()}`,
           companyId,
           qrAttendanceEnabled: true,
-          qrExpiresInMinutes: 5,
+          qrExpiresInMinutes: 30,
           requireAdminPortalHeartbeat: true
         };
         fallbackAttendanceSettings.push(settings);

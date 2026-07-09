@@ -10,7 +10,7 @@ const AttendanceSettingsSchema = new mongoose.Schema({
     unique: true
   },
   qrAttendanceEnabled: { type: Boolean, default: false },
-  qrExpiresInMinutes: { type: Number, default: 5 },
+  qrExpiresInMinutes: { type: Number, default: 30 },
   requireAdminPortalHeartbeat: { type: Boolean, default: true },
   heartbeatIntervalSeconds: { type: Number, default: 10 },
   heartbeatTimeoutSeconds: { type: Number, default: 30 },

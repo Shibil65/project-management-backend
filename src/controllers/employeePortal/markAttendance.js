@@ -221,10 +221,10 @@ async function markAttendance(req, res) {
           });
         }
         attendanceRecord = new AttendanceModel({
-          name: employeeUser.name,
+          name: employeeUser.name || employeeUser.email || email,
           email,
           companyId,
-          org: employeeUser.org,
+          org: employeeUser.org || companyDoc?.name || "Workspace",
           date: todayDateStr,
           checkIn: nowTimeStr,
           checkOut: "",
@@ -279,10 +279,10 @@ async function markAttendance(req, res) {
         }
         attendanceRecord = {
           id: `fb_att_${Date.now()}`,
-          name: employeeUser.name,
+          name: employeeUser.name || employeeUser.email || email,
           email,
           companyId,
-          org: employeeUser.org || "System",
+          org: employeeUser.org || companyDoc?.name || "Workspace",
           date: todayDateStr,
           checkIn: nowTimeStr,
           checkOut: "",

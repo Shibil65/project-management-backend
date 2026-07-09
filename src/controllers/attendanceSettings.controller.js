@@ -14,7 +14,7 @@ const getSettings = asyncHandler(async (req, res) => {
       settings = new AttendanceSettings({
         companyId,
         qrAttendanceEnabled: false,
-        qrExpiresInMinutes: 5,
+        qrExpiresInMinutes: 30,
         requireAdminPortalHeartbeat: true,
         createdBy: email
       });
@@ -29,7 +29,7 @@ const getSettings = asyncHandler(async (req, res) => {
     settings = {
       companyId,
       qrAttendanceEnabled: false,
-      qrExpiresInMinutes: 5,
+      qrExpiresInMinutes: 30,
       requireAdminPortalHeartbeat: true,
       createdBy: email,
       createdAt: new Date(),
