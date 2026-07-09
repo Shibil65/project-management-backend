@@ -117,6 +117,7 @@ async function markAttendance(req, res) {
     const officeLat = toFiniteNumber(companyDoc?.gpsLatitude);
     const officeLon = toFiniteNumber(companyDoc?.gpsLongitude);
     const gpsTrackingEnabled = companyDoc?.gpsTrackingEnabled !== false;
+    portalStatus.gpsTrackingEnabled = gpsTrackingEnabled;
     const hasGeofence = gpsTrackingEnabled && (officeLat !== null || officeLon !== null);
 
     let computedStatus = 'Approved';
