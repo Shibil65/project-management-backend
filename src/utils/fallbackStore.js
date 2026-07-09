@@ -18,6 +18,8 @@ const fallbackPlans = [
 const fallbackTimesheets = [];
 const fallbackCRMProjectLeads = [];
 const fallbackCRMClientLeads = [];
+const fallbackAttendanceSettings = [];
+const fallbackAttendanceQrSessions = [];
 
 module.exports = {
   otpStore,
@@ -32,5 +34,7 @@ module.exports = {
   fallbackPlans,
   fallbackTimesheets,
   fallbackCRMProjectLeads,
-  fallbackCRMClientLeads
+  fallbackCRMClientLeads,
+  fallbackAttendanceSettings,
+  fallbackAttendanceQrSessions
 };
