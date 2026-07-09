@@ -40,6 +40,37 @@ function isValidTime(value) {
   return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
+function normalizeIpEntry(value) {
+  return String(value || '').trim();
+}
+
+function isValidIpv4(value) {
+  const parts = String(value || '').split('.');
+  return parts.length === 4 && parts.every(part => {
+    if (!/^\d+$/.test(part)) return false;
+    const number = Number(part);
+    return number >= 0 && number <= 255 && String(number) === String(Number(part));
+  });
+}
+
+function isValidIpv4OrCidr(value) {
+  const entry = normalizeIpEntry(value);
+  if (!entry) return false;
+  if (!entry.includes('/')) return isValidIpv4(entry);
+  const [ip, prefix] = entry.split('/');
+  const prefixNumber = Number(prefix);
+  return isValidIpv4(ip) && Number.isInteger(prefixNumber) && prefixNumber >= 0 && prefixNumber <= 32;
+}
+
+function parsePublicIpList(value) {
+  if (Array.isArray(value)) {
+    return value.map(normalizeIpEntry).filter(Boolean);
+  }
+  return String(value || '')
+    .split(/[\n,]/)
+    .map(normalizeIpEntry)
+    .filter(Boolean);
+}
 function buildAttendanceSettings(reqBody, res) {
   const updates = {};
   const hasLatitudeField = Object.prototype.hasOwnProperty.call(reqBody, "gpsLatitude");
@@ -91,6 +122,8 @@ function buildAttendanceSettings(reqBody, res) {
     }
     updates.gpsRadius = radius;
   }
+
+  if (reqBody.gpsTrackingEnabled !== undefined) updates.gpsTrackingEnabled = Boolean(reqBody.gpsTrackingEnabled);
 
   if (reqBody.attendancePortalEnabled !== undefined) updates.attendancePortalEnabled = Boolean(reqBody.attendancePortalEnabled);
 

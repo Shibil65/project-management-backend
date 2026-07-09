@@ -21,10 +21,14 @@ const AttendanceSchema = new mongoose.Schema({
   longitude: { type: Number, default: null },
   accuracy: { type: Number, default: null },
   distance: { type: Number, default: null },
+  publicIp: { type: String, default: '' },
+  ipStatus: { type: String, enum: ['Approved', 'Pending Verification', 'Rejected', ''], default: '' },
   checkOutLatitude: { type: Number, default: null },
   checkOutLongitude: { type: Number, default: null },
   checkOutAccuracy: { type: Number, default: null },
   checkOutDistance: { type: Number, default: null },
+  checkOutPublicIp: { type: String, default: '' },
+  checkOutIpStatus: { type: String, enum: ['Approved', 'Pending Verification', 'Rejected', ''], default: '' },
   checkOutStatus: { type: String, enum: ['Approved', 'Pending Verification', 'Rejected'], default: 'Approved' }
 }, { timestamps: true });
 

@@ -116,7 +116,8 @@ async function markAttendance(req, res) {
 
     const officeLat = toFiniteNumber(companyDoc?.gpsLatitude);
     const officeLon = toFiniteNumber(companyDoc?.gpsLongitude);
-    const hasGeofence = officeLat !== null || officeLon !== null;
+    const gpsTrackingEnabled = companyDoc?.gpsTrackingEnabled !== false;
+    const hasGeofence = gpsTrackingEnabled && (officeLat !== null || officeLon !== null);
 
     let computedStatus = 'Approved';
     let remarks = 'IP/Local Verified';
@@ -150,13 +151,21 @@ async function markAttendance(req, res) {
       }
 
       reportedAccuracy = toFiniteNumber(accuracy);
-      if (reportedAccuracy === null || reportedAccuracy > 100) {
+      if (reportedAccuracy === null || reportedAccuracy <= 0) {
         return res.status(400).json({
           success: false,
-          message: `Poor GPS accuracy signal (${reportedAccuracy ? Math.round(reportedAccuracy) + 'm' : 'Unknown'}). High-accuracy GPS is required (must be within 100 meters). Please stand in an open area and try again.`
+          message: "GPS accuracy was not provided by this device. Please enable precise location and try again."
         });
       }
 
+      reportedAccuracy = Math.round(reportedAccuracy);
+      const maxAcceptedAccuracy = 1000;
+      if (reportedAccuracy > maxAcceptedAccuracy) {
+        return res.status(400).json({
+          success: false,
+          message: `GPS signal is too weak (${reportedAccuracy}m accuracy). Please enable precise location, move near a window/open area, and try again.`
+        });
+      }
       distance = getDistance(
         { latitude: officeLat, longitude: officeLon },
         { latitude: employeeLat, longitude: employeeLon }
@@ -164,21 +173,26 @@ async function markAttendance(req, res) {
 
       const configuredRadius = Number(companyDoc.gpsRadius);
       const allowedRadius = Number.isFinite(configuredRadius) && configuredRadius > 0 ? configuredRadius : 200;
+      const accuracyTolerance = Math.min(Math.max(reportedAccuracy || 0, 0), 500);
+      const pendingRadius = allowedRadius + Math.max(50, accuracyTolerance);
+      const roundedDistance = Math.round(distance);
 
-      if (distance <= allowedRadius) {
+      if (distance <= allowedRadius && reportedAccuracy <= 200) {
         computedStatus = 'Approved';
         remarks = 'GPS Verified (Office)';
-      } else if (distance <= allowedRadius + 50) {
+      } else if (distance <= pendingRadius) {
         computedStatus = 'Pending Verification';
-        remarks = `Outside office radius (${Math.round(distance)}m) (Pending Approval)`;
+        remarks = `GPS needs admin review (distance ${roundedDistance}m, accuracy ${reportedAccuracy}m)`;
       } else {
         return res.status(400).json({
           success: false,
-          message: `Location Bound Violation: You must be within the designated area to mark attendance. (Current distance: ${Math.round(distance)}m, maximum allowed radius: ${allowedRadius}m)`,
+          message: `Location Bound Violation: You must be within the designated area to mark attendance. (Current distance: ${roundedDistance}m, maximum allowed radius: ${allowedRadius}m, GPS accuracy: ${reportedAccuracy}m)`,
           details: {
             code: "LOCATION_BOUND_VIOLATION",
-            currentDistanceMeters: Math.round(distance),
+            currentDistanceMeters: roundedDistance,
             maxRadiusMeters: allowedRadius,
+            gpsAccuracyMeters: reportedAccuracy,
+            pendingReviewRadiusMeters: pendingRadius,
             officeCoordinates: { latitude: officeLat, longitude: officeLon },
             receivedCoordinates: { latitude: employeeLat, longitude: employeeLon, accuracy: reportedAccuracy }
           }
