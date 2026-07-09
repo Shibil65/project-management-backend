@@ -77,7 +77,27 @@ const attendanceQrService = {
   },
 
   async getSession(sessionId, companyId) {
-    if (!mongoose.Types.ObjectId.isValid(sessionId) || !mongoose.Types.ObjectId.isValid(companyId)) {
+    console.log(`[DEBUG getSession] sessionId: "${sessionId}" (type: ${typeof sessionId}, length: ${String(sessionId).length})`);
+    console.log(`[DEBUG getSession] companyId: "${companyId}" (type: ${typeof companyId}, length: ${String(companyId).length})`);
+    
+    const isSessionIdValid = mongoose.Types.ObjectId.isValid(sessionId);
+    const isCompanyIdValid = mongoose.Types.ObjectId.isValid(companyId);
+    console.log(`[DEBUG getSession] isSessionIdValid: ${isSessionIdValid}, isCompanyIdValid: ${isCompanyIdValid}`);
+
+    try {
+      const docById = await AttendanceQrSession.findById(sessionId);
+      console.log(`[DEBUG getSession] findById(sessionId):`, docById ? `Found (ID: ${docById._id}, companyId: ${docById.companyId})` : 'Not Found');
+      
+      const docWithoutBypass = await AttendanceQrSession.findOne({ _id: sessionId });
+      console.log(`[DEBUG getSession] findOne WITHOUT bypassTenant:`, docWithoutBypass ? `Found (ID: ${docWithoutBypass._id})` : 'Not Found');
+
+      const docWithBypass = await AttendanceQrSession.findOne({ _id: sessionId }).setOptions({ bypassTenant: true });
+      console.log(`[DEBUG getSession] findOne WITH bypassTenant:`, docWithBypass ? `Found (ID: ${docWithBypass._id})` : 'Not Found');
+    } catch (err) {
+      console.error('[DEBUG getSession] Query Error:', err.message);
+    }
+
+    if (!isSessionIdValid || !isCompanyIdValid) {
       return null;
     }
     const session = await AttendanceQrSession.findOne({ _id: sessionId }).setOptions({ bypassTenant: true });
