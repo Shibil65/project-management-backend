@@ -5,16 +5,23 @@ const requestLogger = require('./middlewares/logger');
 const app = express();
 
 // Register global middlewares
+const allowedOrigins = [
+  'https://syncra-lime.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, postman)
     if (!origin) return callback(null, true);
-    // Dynamically allow the requesting origin to support credentials + custom headers properly
-    callback(null, true);
+    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    callback(null, true); // Fallback to allow other testing origins dynamically
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.options('*', cors());
 app.use(express.json({ limit: '50mb' }));
@@ -27,6 +34,7 @@ const companyRoutes = require('./routes/companies');
 const projectRoutes = require('./routes/projects');
 const employeeRoutes = require('./routes/employees');
 const attendanceRoutes = require('./routes/attendance');
+const attendanceQrRoutes = require('./routes/attendanceQr.routes');
 const leaveRoutes = require('./routes/leaves');
 const clientRoutes = require('./routes/clients');
 const paymentRoutes = require('./routes/payments');
@@ -80,6 +88,7 @@ app.use('/api/companies', companyRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api', employeeRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/attendance/qr', attendanceQrRoutes);
 app.use('/api/leaves', leaveRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/payments', paymentRoutes);

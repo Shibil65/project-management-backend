@@ -118,10 +118,10 @@ async function markAttendance(req, res) {
     const officeLon = toFiniteNumber(companyDoc?.gpsLongitude);
     const gpsTrackingEnabled = companyDoc?.gpsTrackingEnabled !== false;
     portalStatus.gpsTrackingEnabled = gpsTrackingEnabled;
-    const hasGeofence = gpsTrackingEnabled && (officeLat !== null || officeLon !== null);
+    const hasGeofence = gpsTrackingEnabled && (officeLat !== null || officeLon !== null) && req.body.method !== 'manual';
 
     let computedStatus = 'Approved';
-    let remarks = 'IP/Local Verified';
+    let remarks = req.body.method === 'manual' ? 'Manual Clock Verified (Bypassed Scan)' : 'IP/Local Verified';
     let employeeLat = null;
     let employeeLon = null;
     let reportedAccuracy = null;
@@ -234,7 +234,8 @@ async function markAttendance(req, res) {
           latitude: employeeLat,
           longitude: employeeLon,
           accuracy: reportedAccuracy,
-          distance: distance
+          distance: distance,
+          verificationMethod: req.body.method || 'manual'
         });
         await attendanceRecord.save();
       } else {
