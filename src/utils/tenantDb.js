@@ -10,6 +10,7 @@ require('../models/LeaveRequest');
 require('../models/Client');
 require('../models/Payment');
 require('../models/Company');
+require('../models/SubscriptionPlan');
 require('../models/Plan');
 require('../models/Timesheet');
 require('../models/CRMProjectLead');

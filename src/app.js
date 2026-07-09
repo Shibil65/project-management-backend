@@ -34,6 +34,8 @@ const messageRoutes = require('./routes/messages');
 const employeePortalRoutes = require('./routes/employeePortal');
 const planRoutes = require('./routes/plans');
 const clientShareRoutes = require('./routes/clientShareRoutes');
+const { publicRouter: subPlanPublicRouter, adminRouter: subPlanAdminRouter } = require('./routes/subscriptionPlans');
+const subscriptionRoutes = require('./routes/subscriptions');
 const leadRoutes = require('./routes/lead');
 const crmLeadsRoutes = require('./routes/crmLeads');
 const os = require('os');
@@ -85,6 +87,9 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
 app.use('/api/plans', planRoutes);
 app.use('/api/client-share', clientShareRoutes);
+app.use('/api/subscription-plans', subPlanPublicRouter);
+app.use('/api/super-admin/subscription-plans', subPlanAdminRouter);
+app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/lead', leadRoutes);
 app.use('/api/crm-leads', crmLeadsRoutes);
 
