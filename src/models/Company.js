@@ -25,8 +25,8 @@ const CompanySchema = new mongoose.Schema({
   ipTrackingEnabled: { type: Boolean, default: false },
   allowedPublicIps: { type: [String], default: [] },
   attendancePortalEnabled: { type: Boolean, default: true },
-  attendancePortalOpenTime: { type: String, default: '09:00' },
-  attendancePortalCloseTime: { type: String, default: '18:00' }
+  attendancePortalOpenTime: { type: String, default: '' },
+  attendancePortalCloseTime: { type: String, default: '' }
 }, { timestamps: true });
 
 module.exports = mongoose.models.Company || mongoose.model('Company', CompanySchema);

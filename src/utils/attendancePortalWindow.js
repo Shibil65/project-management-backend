@@ -114,21 +114,34 @@ function getAttendanceTodayDate(date = new Date(), timeZone = getAttendanceTimez
 function getAttendancePortalStatus(companyDoc, now = new Date()) {
   const timezone = getAttendanceTimezone();
   const enabled = companyDoc?.attendancePortalEnabled !== false;
-  const openTime = companyDoc?.attendancePortalOpenTime || "09:00";
-  const closeTime = companyDoc?.attendancePortalCloseTime || "18:00";
-  const openMinutes = parseTimeToMinutes(openTime);
-  const closeMinutes = parseTimeToMinutes(closeTime);
+  const openTime = companyDoc?.attendancePortalOpenTime;
+  const closeTime = companyDoc?.attendancePortalCloseTime;
 
   if (!enabled) {
     return {
       enabled: false,
       isOpen: false,
-      openTime,
-      closeTime,
+      openTime: openTime || "",
+      closeTime: closeTime || "",
       timezone,
       message: "Attendance portal is disabled by your company admin."
     };
   }
+
+  // If no portal open/close schedule is specified, the portal remains open indefinitely
+  if (!openTime || !closeTime) {
+    return {
+      enabled,
+      isOpen: true,
+      openTime: openTime || "",
+      closeTime: closeTime || "",
+      timezone,
+      message: "Attendance portal is open indefinitely (no schedule restrictions set)."
+    };
+  }
+
+  const openMinutes = parseTimeToMinutes(openTime);
+  const closeMinutes = parseTimeToMinutes(closeTime);
 
   if (openMinutes === null || closeMinutes === null) {
     return {
@@ -137,7 +150,7 @@ function getAttendancePortalStatus(companyDoc, now = new Date()) {
       openTime,
       closeTime,
       timezone,
-      message: "Attendance portal schedule is not configured correctly."
+      message: "Attendance portal is open indefinitely (schedule configuration is empty or invalid)."
     };
   }
 
