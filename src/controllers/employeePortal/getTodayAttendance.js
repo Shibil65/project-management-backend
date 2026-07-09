@@ -35,10 +35,13 @@ async function getTodayAttendance(req, res) {
       companyDoc = fallbackCompanies.find(c => (c.id || c._id) === companyId) || null;
     }
 
+    const attendancePortal = getAttendancePortalStatus(companyDoc, now);
+    attendancePortal.gpsTrackingEnabled = companyDoc?.gpsTrackingEnabled !== false;
+
     return res.status(200).json({
       success: true,
       data: record,
-      attendancePortal: getAttendancePortalStatus(companyDoc, now)
+      attendancePortal
     });
   } catch (err) {
     console.error("[getTodayAttendance] Error:", err);
