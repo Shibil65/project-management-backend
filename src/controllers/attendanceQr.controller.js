@@ -81,16 +81,11 @@ const startSession = asyncHandler(async (req, res) => {
     createdBy: email
   };
 
-  if (!getIsConnected()) {
-    sessionObj.id = `fb_qrs_${Date.now()}`;
-    sessionObj._id = `fb_qrs_${Date.now()}`;
-    sessionObj.createdAt = now;
-    sessionObj.updatedAt = now;
-  }
-
   const saved = await qrService.saveSession(sessionObj, true);
   const sessionIdStr = saved._id ? saved._id.toString() : saved.id;
   const companyIdStr = companyId.toString();
+
+  console.log(`[QR Session] Created session ID ${sessionIdStr} for company ${companyIdStr} by ${email}`);
 
   const qrPayload = {
     type: 'SYNCRA_ATTENDANCE_QR',
@@ -117,6 +112,7 @@ const heartbeat = asyncHandler(async (req, res) => {
 
   const session = await qrService.getSession(sessionId, companyId);
   if (!session) {
+    console.warn(`[QR Session] Heartbeat lookup failed. Session not found: ${sessionId} for company: ${companyId}`);
     return res.status(404).json({ success: false, message: 'Active QR session not found.' });
   }
 
@@ -133,6 +129,7 @@ const closeSession = asyncHandler(async (req, res) => {
 
   const session = await qrService.getSession(sessionId, companyId);
   if (!session) {
+    console.warn(`[QR Session] Close lookup failed. Session not found: ${sessionId} for company: ${companyId}`);
     return res.status(404).json({ success: false, message: 'QR session not found.' });
   }
 
@@ -151,6 +148,7 @@ const getSessionStatus = asyncHandler(async (req, res) => {
 
   const session = await qrService.getSession(sessionId, companyId);
   if (!session) {
+    console.warn(`[QR Session] Status lookup failed. Session not found: ${sessionId} for company: ${companyId}`);
     return res.status(404).json({ success: false, message: 'Session not found.' });
   }
 

@@ -77,51 +77,30 @@ const attendanceQrService = {
   },
 
   async getSession(sessionId, companyId) {
-    if (getIsConnected()) {
-      if (!mongoose.Types.ObjectId.isValid(sessionId) || !mongoose.Types.ObjectId.isValid(companyId)) {
-        return null;
-      }
-      const session = await AttendanceQrSession.findOne({ _id: sessionId }).setOptions({ bypassTenant: true });
-      if (session && session.companyId.toString() !== companyId.toString()) {
-        return null;
-      }
-      return session;
-    } else {
-      return fallbackAttendanceQrSessions.find(s => s.id === sessionId && s.companyId === companyId);
+    if (!mongoose.Types.ObjectId.isValid(sessionId) || !mongoose.Types.ObjectId.isValid(companyId)) {
+      return null;
     }
+    const session = await AttendanceQrSession.findOne({ _id: sessionId }).setOptions({ bypassTenant: true });
+    if (session && session.companyId.toString() !== companyId.toString()) {
+      return null;
+    }
+    return session;
   },
 
   async closeActiveSessions(companyId) {
-    if (getIsConnected()) {
-      await AttendanceQrSession.updateMany(
-        { companyId, isActive: true },
-        { $set: { isActive: false, sessionStatus: 'closed', closedAt: new Date() } }
-      ).setOptions({ bypassTenant: true });
-    } else {
-      fallbackAttendanceQrSessions.forEach(s => {
-        if (s.companyId === companyId && s.isActive) {
-          s.isActive = false;
-          s.sessionStatus = 'closed';
-          s.closedAt = new Date();
-        }
-      });
-    }
+    await AttendanceQrSession.updateMany(
+      { companyId, isActive: true },
+      { $set: { isActive: false, sessionStatus: 'closed', closedAt: new Date() } }
+    ).setOptions({ bypassTenant: true });
   },
 
   async saveSession(sessionObj, isNew = false) {
-    if (getIsConnected()) {
-      if (isNew) {
-        const doc = new AttendanceQrSession(sessionObj);
-        await doc.save();
-        return doc;
-      } else {
-        await sessionObj.save();
-        return sessionObj;
-      }
+    if (isNew) {
+      const doc = new AttendanceQrSession(sessionObj);
+      await doc.save();
+      return doc;
     } else {
-      if (isNew) {
-        fallbackAttendanceQrSessions.push(sessionObj);
-      }
+      await sessionObj.save();
       return sessionObj;
     }
   },

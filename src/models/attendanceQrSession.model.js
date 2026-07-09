@@ -13,6 +13,7 @@ const AttendanceQrSessionSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   expiresAt: { type: Date, required: true },
   lastHeartbeatAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: Date.now, expires: 86400 },
   closedAt: { type: Date },
   createdBy: { type: String, default: '' }
 }, { timestamps: true });

@@ -101,18 +101,6 @@ app.use('/api/super-admin/subscription-packages', superAdminSubscriptionPackageR
 app.use('/api/lead', leadRoutes);
 app.use('/api/crm-leads', crmLeadsRoutes);
 
-app.get('/api/test-db', async (req, res) => {
-  try {
-    const mongoose = require('mongoose');
-    const User = require('./models/User');
-    const Attendance = require('./models/Attendance');
-    const user = await User.findOne({ email: 'emp2@gmail.com' });
-    const attendanceLogs = await Attendance.find({ email: 'emp2@gmail.com' }).sort({ createdAt: -1 }).limit(10);
-    return res.status(200).json({ success: true, user, attendanceLogs });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 // Global JSON 404 Handler
 app.use((req, res, next) => {
