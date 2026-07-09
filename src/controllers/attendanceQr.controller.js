@@ -13,8 +13,9 @@ const {
 // Helper to calculate minutes left until portal close
 function calculateMinutesToClose(companyDoc, now) {
   try {
-    const openTime = companyDoc?.attendancePortalOpenTime || '09:00';
-    const closeTime = companyDoc?.attendancePortalCloseTime || '18:00';
+    const openTime = companyDoc?.attendancePortalOpenTime;
+    const closeTime = companyDoc?.attendancePortalCloseTime;
+    if (!openTime || !closeTime) return 0;
     
     const openMinutes = require('../utils/attendancePortalWindow').parseTimeToMinutes(openTime) || 540;
     const closeMinutes = require('../utils/attendancePortalWindow').parseTimeToMinutes(closeTime) || 1080;
@@ -55,12 +56,7 @@ const startSession = asyncHandler(async (req, res) => {
   const companyDoc = await qrService.getCompanyDoc(companyId);
   const now = new Date();
   const portalStatus = getAttendancePortalStatus(companyDoc, now);
-  if (!portalStatus.isOpen) {
-    return res.status(400).json({
-      success: false,
-      message: `Attendance portal is closed. (${portalStatus.message})`
-    });
-  }
+  // Allow admin to generate session regardless of portal schedule for testing/kiosk preparation
 
   // Close previous active sessions
   await qrService.closeActiveSessions(companyId);
