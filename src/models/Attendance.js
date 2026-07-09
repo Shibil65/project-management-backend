@@ -29,7 +29,10 @@ const AttendanceSchema = new mongoose.Schema({
   checkOutDistance: { type: Number, default: null },
   checkOutPublicIp: { type: String, default: '' },
   checkOutIpStatus: { type: String, enum: ['Approved', 'Pending Verification', 'Rejected', ''], default: '' },
-  checkOutStatus: { type: String, enum: ['Approved', 'Pending Verification', 'Rejected'], default: 'Approved' }
+  checkOutStatus: { type: String, enum: ['Approved', 'Pending Verification', 'Rejected'], default: 'Approved' },
+  verificationMethod: { type: String, enum: ['qr', 'gps', 'manual'], default: 'gps' },
+  qrSessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'AttendanceQrSession', default: null },
+  deviceInfo: { type: String, default: '' }
 }, { timestamps: true });
 
 const { tenantPlugin } = require('../utils/tenantPlugin');

@@ -15,6 +15,8 @@ require('../models/Plan');
 require('../models/Timesheet');
 require('../models/CRMProjectLead');
 require('../models/CRMClientLead');
+require('../models/attendanceSettings.model');
+require('../models/attendanceQrSession.model');
 
 /**
  * Returns a mongoose model bound to the default connection (single-database).
