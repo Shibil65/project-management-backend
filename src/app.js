@@ -107,5 +107,41 @@ app.use((req, res, next) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });
 
+// Global JSON Error Handler (must have 4 args for Express to treat it as error middleware)
+// This catches any error passed via next(err) from asyncHandler or any route
+app.use((err, req, res, next) => {
+  console.error('[Global Error Handler]', err);
+
+  // Mongoose validation error
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      message: Object.values(err.errors).map(e => e.message).join(', ')
+    });
+  }
+
+  // Mongoose cast error (invalid ObjectId etc.)
+  if (err.name === 'CastError') {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid value for field: ${err.path}`
+    });
+  }
+
+  // JWT errors
+  if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Unauthorized. Please login again.'
+    });
+  }
+
+  // Default: return JSON 500 instead of HTML
+  return res.status(err.status || err.statusCode || 500).json({
+    success: false,
+    message: err.message || 'Internal server error. Please try again.'
+  });
+});
+
 // Export app
 module.exports = app;
