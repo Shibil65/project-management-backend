@@ -21,6 +21,7 @@ async function resolveAuthenticatedUser(decoded) {
   if (decoded.role === 'Super Admin') {
     return {
       email,
+      name: decoded.name || email,
       role: 'Super Admin',
       companyId: '',
       org: decoded.org || 'System Admin',
@@ -34,6 +35,7 @@ async function resolveAuthenticatedUser(decoded) {
       if (user.status === 'Suspended') return null;
       return {
         email,
+        name: user.name || decoded.name || email,
         role: user.role || decoded.role || 'Employee',
         companyId: normalizeId(user.companyId || decoded.companyId),
         org: user.org || decoded.org || '',
@@ -45,6 +47,7 @@ async function resolveAuthenticatedUser(decoded) {
     if (employee) {
       return {
         email,
+        name: employee.name || decoded.name || email,
         role: employee.role || decoded.role || 'Employee',
         companyId: normalizeId(employee.companyId || decoded.companyId),
         org: employee.org || decoded.org || '',
@@ -56,6 +59,7 @@ async function resolveAuthenticatedUser(decoded) {
     if (company) {
       return {
         email,
+        name: company.adminName || decoded.name || email,
         role: 'Company Admin',
         companyId: normalizeId(company._id),
         org: company.name || decoded.org || '',
@@ -71,6 +75,7 @@ async function resolveAuthenticatedUser(decoded) {
     if (fallbackUser.status === 'Suspended') return null;
     return {
       email,
+      name: fallbackUser.name || decoded.name || email,
       role: fallbackUser.role || decoded.role || 'Employee',
       companyId: normalizeId(fallbackUser.companyId || decoded.companyId),
       org: fallbackUser.org || decoded.org || '',
@@ -84,6 +89,7 @@ async function resolveAuthenticatedUser(decoded) {
   if (fallbackCompany) {
     return {
       email,
+      name: fallbackCompany.adminName || decoded.name || email,
       role: 'Company Admin',
       companyId: normalizeId(fallbackCompany._id || fallbackCompany.id),
       org: fallbackCompany.name || decoded.org || '',
@@ -94,6 +100,7 @@ async function resolveAuthenticatedUser(decoded) {
   if (decoded.role && (decoded.companyId || decoded.role === 'Super Admin')) {
     return {
       email,
+      name: decoded.name || email,
       role: decoded.role,
       companyId: normalizeId(decoded.companyId),
       org: decoded.org || '',
@@ -126,6 +133,7 @@ async function authMiddleware(req, res, next) {
       resolved = decoded.email
         ? {
             email: normalizeEmail(decoded.email),
+            name: decoded.name || normalizeEmail(decoded.email),
             role: decoded.role || 'Employee',
             companyId: normalizeId(decoded.companyId),
             org: decoded.org || '',
