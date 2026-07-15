@@ -96,9 +96,10 @@ function getStatusForDate({
   portalEnabled
 }) {
   const onLeave = rawLeaves.some(l => {
-    const start = new Date(l.startDate);
+    const start = parseDateStr(l.startDate);
+    const end = parseDateStr(l.endDate);
+    if (!start || !end) return false;
     start.setHours(0, 0, 0, 0);
-    const end = new Date(l.endDate);
     end.setHours(0, 0, 0, 0);
     return currentDate >= start && currentDate <= end;
   });
@@ -109,7 +110,10 @@ function getStatusForDate({
 
   if (record) {
     const hours = parseDurationToHours(record.duration);
-    const status = (record.checkOut && hours > 0 && hours < 5) ? 'Half Day' : 'Present';
+    let status = record.status || 'Present';
+    if (status === 'Approved') {
+      status = (record.checkOut && hours > 0 && hours < 5) ? 'Half Day' : 'Present';
+    }
     const isLate = isCheckInLate(record.checkIn, openTime);
     return { status, isLate };
   }
@@ -165,8 +169,15 @@ async function getAttendanceReport(req, res) {
   let employee = null;
   if (getIsConnected()) {
     try {
-      const User = getTenantModel(companyId, 'User');
-      employee = await User.findById(employeeId);
+      const mongoose = require('mongoose');
+      if (mongoose.Types.ObjectId.isValid(employeeId)) {
+        const User = getTenantModel(companyId, 'User');
+        employee = await User.findById(employeeId);
+        if (!employee) {
+          const EmployeeModel = getTenantModel(companyId, 'Employee');
+          employee = await EmployeeModel.findById(employeeId);
+        }
+      }
     } catch (e) {
       console.error('Error fetching user report details:', e);
     }

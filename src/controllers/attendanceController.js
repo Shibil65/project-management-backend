@@ -129,7 +129,15 @@ async function adminMarkAttendance(req, res) {
   if (getIsConnected()) {
     try {
       const UserModel = getTenantModel(companyId, 'User');
-      const employee = await UserModel.findOne({ email: employeeEmail.toLowerCase() });
+      let employee = await UserModel.findOne({ email: employeeEmail.toLowerCase() });
+      if (!employee) {
+        try {
+          const EmployeeModel = getTenantModel(companyId, 'Employee');
+          employee = await EmployeeModel.findOne({ email: employeeEmail.toLowerCase() });
+        } catch (e) {
+          console.error('Error checking employee model details in adminMarkAttendance:', e);
+        }
+      }
       if (!employee) {
         return res.status(404).json({ success: false, message: 'Employee not found.' });
       }
@@ -207,6 +215,28 @@ async function adminMarkAttendance(req, res) {
 
 function parseDbDate(dateStr) {
   if (!dateStr) return null;
+  const cleanStr = String(dateStr).replace(/,/g, '').trim();
+  const isoMatch = cleanStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+  }
+  const parts = cleanStr.split(/\s+/);
+  if (parts.length === 3) {
+    const months = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+    };
+    let day = parseInt(parts[0], 10);
+    let month = months[parts[1].toLowerCase().substring(0, 3)];
+    let year = parseInt(parts[2], 10);
+    if (isNaN(day)) {
+      month = months[parts[0].toLowerCase().substring(0, 3)];
+      day = parseInt(parts[1], 10);
+    }
+    if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+      return new Date(year, month, day);
+    }
+  }
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return null;
   return d;
@@ -319,9 +349,10 @@ function getStatusForDate({
   portalEnabled
 }) {
   const onLeave = rawLeaves.some(l => {
-    const start = new Date(l.startDate);
+    const start = parseDbDate(l.startDate);
+    const end = parseDbDate(l.endDate);
+    if (!start || !end) return false;
     start.setHours(0, 0, 0, 0);
-    const end = new Date(l.endDate);
     end.setHours(0, 0, 0, 0);
     return currentDate >= start && currentDate <= end;
   });
@@ -332,7 +363,10 @@ function getStatusForDate({
 
   if (record) {
     const hours = parseDurationToHours(record.duration);
-    const status = (record.checkOut && hours > 0 && hours < 5) ? 'Half Day' : 'Present';
+    let status = record.status || 'Present';
+    if (status === 'Approved') {
+      status = (record.checkOut && hours > 0 && hours < 5) ? 'Half Day' : 'Present';
+    }
     const isLate = isCheckInLate(record.checkIn, openTime);
     return { status, isLate };
   }
@@ -385,33 +419,52 @@ async function resolveEmployeeContext(req, companyId) {
   const targetEmail = req.query.email;
   
   if (req.user.role === 'Company Admin' || req.user.role === 'Super Admin') {
+    let emp = null;
     if (targetEmployeeId) {
       if (getIsConnected()) {
-        const UserModel = getTenantModel(companyId, 'User');
-        const emp = await UserModel.findById(targetEmployeeId);
-        if (emp) {
-          employeeEmail = emp.email;
-          employeeName = emp.name;
+        try {
+          const mongoose = require('mongoose');
+          if (mongoose.Types.ObjectId.isValid(targetEmployeeId)) {
+            const UserModel = getTenantModel(companyId, 'User');
+            emp = await UserModel.findById(targetEmployeeId);
+            if (!emp) {
+              const EmployeeModel = getTenantModel(companyId, 'Employee');
+              emp = await EmployeeModel.findById(targetEmployeeId);
+            }
+          }
+        } catch (e) {
+          console.error('Error fetching employee details by ID:', e);
         }
       } else {
         const { fallbackUsers } = require('../utils/fallbackStore');
-        const emp = fallbackUsers.find(u => u.id === targetEmployeeId || u._id === targetEmployeeId);
-        if (emp) {
-          employeeEmail = emp.email;
-          employeeName = emp.name;
-        }
+        emp = fallbackUsers.find(u => u.id === targetEmployeeId || u._id === targetEmployeeId);
       }
+    }
+    
+    // Fallback to targetEmail if search by ID yielded nothing
+    if (!emp && targetEmail) {
+      if (getIsConnected()) {
+        try {
+          const UserModel = getTenantModel(companyId, 'User');
+          emp = await UserModel.findOne({ email: targetEmail.toLowerCase() });
+          if (!emp) {
+            const EmployeeModel = getTenantModel(companyId, 'Employee');
+            emp = await EmployeeModel.findOne({ email: targetEmail.toLowerCase() });
+          }
+        } catch (e) {
+          console.error('Error fetching employee details by email:', e);
+        }
+      } else {
+        const { fallbackUsers } = require('../utils/fallbackStore');
+        emp = fallbackUsers.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
+      }
+    }
+
+    if (emp) {
+      employeeEmail = emp.email;
+      employeeName = emp.name;
     } else if (targetEmail) {
       employeeEmail = targetEmail;
-      if (getIsConnected()) {
-        const UserModel = getTenantModel(companyId, 'User');
-        const emp = await UserModel.findOne({ email: targetEmail.toLowerCase() });
-        if (emp) employeeName = emp.name;
-      } else {
-        const { fallbackUsers } = require('../utils/fallbackStore');
-        const emp = fallbackUsers.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
-        if (emp) employeeName = emp.name;
-      }
     }
   }
   return { employeeEmail, employeeName };
@@ -702,9 +755,10 @@ async function getAttendanceDetailByDate(req, res) {
     
     if (status === 'Leave') {
       const activeLeave = rawLeaves.find(l => {
-        const start = new Date(l.startDate);
+        const start = parseDbDate(l.startDate);
+        const end = parseDbDate(l.endDate);
+        if (!start || !end) return false;
         start.setHours(0, 0, 0, 0);
-        const end = new Date(l.endDate);
         end.setHours(0, 0, 0, 0);
         return targetDate >= start && targetDate <= end;
       });
