@@ -337,7 +337,7 @@ function getStatusForDate({
     return { status, isLate };
   }
 
-  const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
+  const isWeekend = currentDate.getDay() === 0;
   if (isWeekend) {
     return { status: 'Holiday', isLate: false };
   }

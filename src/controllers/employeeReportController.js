@@ -22,6 +22,36 @@ function formatDateValue(value) {
   return format(date, 'yyyy-MM-dd');
 }
 
+// Robust date string parser to prevent timezone shifts
+function parseDateStr(dateStr) {
+  if (!dateStr) return null;
+  const cleanStr = String(dateStr).replace(/,/g, '').trim();
+  const isoMatch = cleanStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+  }
+  const parts = cleanStr.split(/\s+/);
+  if (parts.length === 3) {
+    const months = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+    };
+    let day = parseInt(parts[0], 10);
+    let month = months[parts[1].toLowerCase().substring(0, 3)];
+    let year = parseInt(parts[2], 10);
+    if (isNaN(day)) {
+      month = months[parts[0].toLowerCase().substring(0, 3)];
+      day = parseInt(parts[1], 10);
+    }
+    if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+      return new Date(year, month, day);
+    }
+  }
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  return d;
+}
+
 function parseTimeToMinutes(value) {
   if (typeof value !== "string") return null;
   const match = value.match(/^(\d{1,2}):(\d{2})$/);
@@ -84,7 +114,7 @@ function getStatusForDate({
     return { status, isLate };
   }
 
-  const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
+  const isWeekend = currentDate.getDay() === 0;
   if (isWeekend) {
     return { status: 'Holiday', isLate: false };
   }
@@ -129,6 +159,7 @@ function getStatusForDate({
 async function getAttendanceReport(req, res) {
   const { employeeId } = req.params;
   const companyId = req.user.companyId;
+  const { month, year } = req.query;
 
   // 1. Fetch Employee Profile
   let employee = null;
@@ -196,21 +227,28 @@ async function getAttendanceReport(req, res) {
   // 5. Generate Log calendar for Current Month
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const yearNum = today.getFullYear();
-  const monthNum = today.getMonth() + 1;
+  let yearNum = parseInt(year, 10);
+  let monthNum = parseInt(month, 10);
+  if (isNaN(yearNum)) yearNum = today.getFullYear();
+  if (isNaN(monthNum)) monthNum = today.getMonth() + 1;
   
   const rangeStart = new Date(yearNum, monthNum - 1, 1);
   const rangeEnd = new Date(yearNum, monthNum, 0);
   
+  let limitDate = new Date(rangeEnd);
+  if (yearNum === today.getFullYear() && monthNum === (today.getMonth() + 1)) {
+    limitDate = today;
+  }
+  
   const calendar = [];
   let cur = new Date(rangeStart);
-  while (cur <= rangeEnd) {
+  while (cur <= limitDate) {
     const currentDate = new Date(cur);
     currentDate.setHours(0, 0, 0, 0);
     
     const record = records.find(a => {
       if (!a.date) return false;
-      const dbDate = new Date(a.date);
+      const dbDate = parseDateStr(a.date);
       return dbDate && 
              dbDate.getFullYear() === currentDate.getFullYear() && 
              dbDate.getMonth() === currentDate.getMonth() && 
