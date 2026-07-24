@@ -171,7 +171,7 @@ async function sendPasswordResetEmail(email, resetUrl) {
   }
 
   try {
-    const html = passwordResetTemplate(email, resetUrl);
+    const html = passwordResetTemplate(resetUrl, email, 60);
 
     console.log(`[MAIL] Dispatching password reset email to: ${email}...`);
 
