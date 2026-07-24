@@ -15,6 +15,7 @@ const {
 } = require("../../utils/fallbackStore");
 const {
   getAttendancePortalStatus,
+  processAutoCheckout,
   formatAttendanceDate,
   formatAttendanceTime,
   getAttendanceDateCandidates
@@ -105,6 +106,15 @@ async function markAttendance(req, res) {
     }
 
     const now = new Date();
+    await processAutoCheckout(companyId, companyDoc, now);
+
+    if (req.body.method === 'manual' && companyDoc?.manualCheckInEnabled === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Manual check-in is disabled by your company admin."
+      });
+    }
+
     const portalStatus = getAttendancePortalStatus(companyDoc, now);
     if (action === "checkIn" && !portalStatus.isOpen) {
       return res.status(403).json({

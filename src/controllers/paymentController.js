@@ -113,7 +113,7 @@ async function createRazorpayOrder(req, res) {
       payment_capture: 1,
       notes: {
         plan: planName,
-        source: 'Syncra SaaS Registration'
+        source: 'Duskra SaaS Registration'
       }
     };
     console.log('[createRazorpayOrder] Sending to Razorpay:', orderPayload);
@@ -194,7 +194,7 @@ async function verifyRazorpayPayment(req, res) {
       const newPayment = new Payment({
         clientName: email,
         companyId,
-        org: org || company?.name || 'Syncra Org',
+        org: org || company?.name || 'Duskra Org',
         amount: billing,
         status: 'Paid',
         paymentId: razorpay_payment_id || `pay_up_${Math.random().toString(36).substring(2, 9).toUpperCase()}`
@@ -214,7 +214,7 @@ async function verifyRazorpayPayment(req, res) {
       id: `pay_${Date.now()}`,
       clientName: email,
       companyId,
-      org: org || company?.name || 'Syncra Org',
+      org: org || company?.name || 'Duskra Org',
       amount: billing,
       status: 'Paid',
       paymentId: razorpay_payment_id || `pay_up_${Math.random().toString(36).substring(2, 9).toUpperCase()}`,

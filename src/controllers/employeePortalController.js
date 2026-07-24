@@ -17,4 +17,5 @@ module.exports = {
   ...require('./employeePortal/updateProjectComments'),
   ...require('./employeePortal/uploadProjectDocument'),
   ...require('./employeePortal/deleteProjectDocument'),
+  ...require('./employeePortal/forgotPassword'),
 };

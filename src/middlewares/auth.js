@@ -123,7 +123,16 @@ async function authMiddleware(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'syncra_secret_key_123');
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'duskra_secret_key_123');
+    } catch (jwtErr) {
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET || 'syncra_secret_key_123');
+      } catch (jwtErr2) {
+        decoded = jwt.verify(token, process.env.JWT_SECRET || 'bloombiz_secret_key_123');
+      }
+    }
     let resolved;
 
     try {

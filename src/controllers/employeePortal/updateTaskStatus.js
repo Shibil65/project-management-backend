@@ -1,4 +1,4 @@
-﻿const bcrypt = require("bcryptjs");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const {
   getIsConnected
@@ -20,7 +20,7 @@ const {
   fallbackPlans
 } = require("../../utils/fallbackStore");
 const { isEmailMatch, isTaskAssignedTo } = require("../../utils/taskAssignment");
-const JWT_SECRET = process.env.JWT_SECRET || "syncra_secret_key_123";
+const JWT_SECRET = process.env.JWT_SECRET || "duskra_secret_key_123";
 
 function resolveFallbackUser(userId, email) {
   return fallbackUsers.find(u => (u._id || u.id) === userId) || email && fallbackUsers.find(u => u.email?.toLowerCase() === email.toLowerCase()) || null;

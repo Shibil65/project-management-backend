@@ -256,7 +256,7 @@ async function sendEmail({ to, subject, html, text, from, replyTo, headers }) {
     replyTo: replyTo || smtpConfig.user,
     headers: {
       'X-Auto-Response-Suppress': 'OOF, AutoReply',
-      'X-Entity-Ref-ID': `syncra-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      'X-Entity-Ref-ID': `duskra-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       'Precedence': 'bulk',
       ...headers
     }

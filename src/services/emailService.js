@@ -3,6 +3,7 @@ const { mailConfig } = require('../config/mailConfig');
 const otpEmailTemplate = require('./email/templates/otpEmailTemplate');
 const employeeInvitationTemplate = require('./email/templates/employeeInvitationTemplate');
 const welcomeCompanyTemplate = require('./email/templates/welcomeCompanyTemplate');
+const passwordResetTemplate = require('./email/templates/passwordResetTemplate');
 
 function getOtpMailFailureMessage(error) {
   const code = String(error?.code || '').toUpperCase();
@@ -63,8 +64,8 @@ async function sendEmailOtp(email, otp) {
 
     await sendEmail({
       to: email,
-      subject: 'Syncra Verification Code',
-      text: `Your Syncra verification code is ${otp}. It expires in 10 minutes. If you did not request this code, ignore this email.`,
+      subject: 'Duskra Verification Code',
+      text: `Your Duskra verification code is ${otp}. It expires in 10 minutes. If you did not request this code, ignore this email.`,
       html,
       headers: { 'X-Priority': '1', 'Importance': 'high' }
     });
@@ -108,8 +109,8 @@ async function sendWelcomeEmail(adminEmail, adminName, companyName) {
 
     await sendEmail({
       to: adminEmail,
-      subject: `Your Syncra workspace is ready: ${companyName}`,
-      text: `Hello ${adminName || 'Admin'}, your Syncra workspace for ${companyName || 'your company'} is ready. Open ${process.env.FRONTEND_URL || 'http://localhost:5173'} and request an OTP to sign in.`,
+      subject: `Your Duskra workspace is ready: ${companyName}`,
+      text: `Hello ${adminName || 'Admin'}, your Duskra workspace for ${companyName || 'your company'} is ready. Open ${process.env.FRONTEND_URL || 'http://localhost:5173'} and request an OTP to sign in.`,
       html
     });
 
@@ -140,8 +141,8 @@ async function sendEmployeeInviteEmail(email, name, role, portalUrl, tempPasswor
 
     await sendEmail({
       to: email,
-      subject: 'Syncra workspace invitation',
-      text: `Hi ${name || 'Team member'}, you have been added to ${companyName || 'your Syncra workspace'} as ${role || 'Employee'}. Portal: ${portalUrl}. Login email: ${email}. Temporary password: ${tempPassword}. Please change your password after logging in.`,
+      subject: 'Duskra workspace invitation',
+      text: `Hi ${name || 'Team member'}, you have been added to ${companyName || 'your Duskra workspace'} as ${role || 'Employee'}. Portal: ${portalUrl}. Login email: ${email}. Temporary password: ${tempPassword}. Please change your password after logging in.`,
       html,
       replyTo: companyEmail
     });
@@ -153,8 +154,52 @@ async function sendEmployeeInviteEmail(email, name, role, portalUrl, tempPasswor
   }
 }
 
+async function sendPasswordResetEmail(email, resetUrl) {
+  const isConfigured = mailConfig.provider === 'api' ? !!mailConfig.api.key : isSmtpConfigured();
+
+  if (!isConfigured) {
+    console.warn('[MAIL] Password reset email not sent via SMTP/API. Config missing.');
+    console.log('\n--- [EMPLOYEE PASSWORD RESET LINK LOG] ---');
+    console.log(`To: ${email}`);
+    console.log(`Reset URL: ${resetUrl}`);
+    console.log('-------------------------------------------\n');
+    return {
+      success: true,
+      message: 'Password reset link generated. (Check server console or dev alert if SMTP is unconfigured)',
+      devResetUrl: resetUrl
+    };
+  }
+
+  try {
+    const html = passwordResetTemplate(email, resetUrl);
+
+    console.log(`[MAIL] Dispatching password reset email to: ${email}...`);
+
+    await sendEmail({
+      to: email,
+      subject: 'Reset Your Password - Duskra Employee Workspace',
+      text: `Hello, we received a request to reset your password. Open this link to set a new password: ${resetUrl}. This link will expire in 1 hour.`,
+      html
+    });
+
+    console.log(`[MAIL SUCCESS] Password reset email sent to ${email}`);
+    return { success: true, message: 'Password reset link has been dispatched to your email address.' };
+  } catch (err) {
+    const errorDetails = getSmtpErrorDetails ? getSmtpErrorDetails(err) : { message: err.message };
+    console.error('[MAIL ERROR] Failed to send password reset email:', errorDetails);
+
+    return {
+      success: true, // Fallback gracefully for dev environment so user is not blocked
+      message: getOtpMailFailureMessage ? getOtpMailFailureMessage(err) : 'Mail server notice: Check SMTP credentials.',
+      devResetUrl: resetUrl,
+      mailError: process.env.NODE_ENV === 'production' ? undefined : err.message
+    };
+  }
+}
+
 module.exports = {
   sendEmailOtp,
   sendWelcomeEmail,
-  sendEmployeeInviteEmail
+  sendEmployeeInviteEmail,
+  sendPasswordResetEmail
 };

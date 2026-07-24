@@ -10,14 +10,14 @@ const mailConfig = {
     secure: process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
-    fromName: process.env.SMTP_FROM_NAME || 'Syncra',
+    fromName: process.env.SMTP_FROM_NAME || 'Duskra',
     fromEmail: process.env.SMTP_FROM_EMAIL || ''
   },
 
   // API Mode Config
   api: {
     key: process.env.BREVO_API_KEY || '',
-    senderName: process.env.BREVO_SENDER_NAME || 'Syncra',
+    senderName: process.env.BREVO_SENDER_NAME || 'Duskra',
     senderEmail: process.env.BREVO_SENDER_EMAIL || ''
   },
 

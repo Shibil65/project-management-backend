@@ -123,7 +123,11 @@ async function createCompany(req, res) {
         billingEmail: adminEmail,
         status: "Active",
         admin: adminEmail,
-        isDeleted: false
+        isDeleted: false,
+        attendancePortalEnabled: true,
+        manualCheckInEnabled: true,
+        attendancePortalOpenTime: "09:00",
+        attendancePortalCloseTime: "18:00"
       });
       await newCompany.save();
 
@@ -143,7 +147,6 @@ async function createCompany(req, res) {
         org: name,
         amount: planBilling,
         status: "Paid",
-        paymentId: createPaymentId(),
         paymentId: paymentId || createPaymentId(),
         paymentMethod: paymentMethod || "Credit Card",
         date: new Date().toLocaleDateString(undefined, {
@@ -200,6 +203,7 @@ async function createCompany(req, res) {
     admin: adminEmail,
     isDeleted: false,
     attendancePortalEnabled: true,
+    manualCheckInEnabled: true,
     attendancePortalOpenTime: "09:00",
     attendancePortalCloseTime: "18:00"
   };
@@ -223,7 +227,6 @@ async function createCompany(req, res) {
     org: name,
     amount: planBilling,
     status: "Paid",
-    paymentId: createPaymentId(),
     paymentId: paymentId || createPaymentId(),
     paymentMethod: paymentMethod || "Credit Card",
     date: new Date().toLocaleDateString(undefined, {
@@ -243,5 +246,4 @@ async function createCompany(req, res) {
   });
 }
 
-module.exports = { createCompany };
 module.exports = { createCompany };

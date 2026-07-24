@@ -25,10 +25,10 @@ const CompanySchema = new mongoose.Schema({
   ipTrackingEnabled: { type: Boolean, default: false },
   allowedPublicIps: { type: [String], default: [] },
   attendancePortalEnabled: { type: Boolean, default: true },
+  manualCheckInEnabled: { type: Boolean, default: true },
   attendancePortalOpenTime: { type: String, default: '' },
   attendancePortalCloseTime: { type: String, default: '' }
 }, { timestamps: true });
 
-module.exports = mongoose.models.Company || mongoose.model('Company', CompanySchema);
-
-
+delete mongoose.models.Company;
+module.exports = mongoose.model('Company', CompanySchema);

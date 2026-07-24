@@ -11,16 +11,19 @@
  * @param {number} expiryMinutes - Expiry time in minutes.
  * @returns {string} Fully styled HTML template string.
  */
+const { getEmailHeader } = require('../utils/emailHeaderHelper');
+
 function otpEmailTemplate(otpCodeCode, expiryMinutes = 10) {
   const year = new Date().getFullYear();
-  
+  const headerHtml = getEmailHeader('Duskra Security Portal', 'Verification Code');
+
   return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Syncra Verification Code</title>
+      <title>Duskra Verification Code</title>
       <style>
         body {
           margin: 0;
@@ -37,18 +40,6 @@ function otpEmailTemplate(otpCodeCode, expiryMinutes = 10) {
           border-radius: 16px;
           overflow: hidden;
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-        }
-        .header {
-          background: linear-gradient(135deg, #4F46E5, #4338CA);
-          padding: 32px;
-          text-align: center;
-          color: #ffffff;
-        }
-        .header h1 {
-          margin: 0;
-          font-size: 24px;
-          font-weight: 800;
-          letter-spacing: -0.5px;
         }
         .content {
           padding: 32px;
@@ -101,12 +92,10 @@ function otpEmailTemplate(otpCodeCode, expiryMinutes = 10) {
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>Syncra Security Portal</h1>
-        </div>
+        ${headerHtml}
         <div class="content">
           <h2 class="title">Verification Code</h2>
-          <p class="text">Use the secure verification code below to authorize your login request on the Syncra MERN Portal.</p>
+          <p class="text">Use the secure verification code below to authorize your login request on the Duskra Portal.</p>
           
           <div class="otp-box">${otpCodeCode}</div>
           
@@ -115,16 +104,16 @@ function otpEmailTemplate(otpCodeCode, expiryMinutes = 10) {
           </p>
           
           <div class="warning-box">
-            <strong>Security Warning:</strong> Do not share this OTP with anyone. Syncra administrators will never ask for your verification passcode.
+            <strong>Security Warning:</strong> Do not share this OTP with anyone. Duskra administrators will never ask for your verification passcode.
           </div>
           
           <p class="text" style="margin-bottom: 0; font-size: 13px; margin-top: 24px;">
             Regards,<br>
-            <strong>Syncra Security Node</strong>
+            <strong>Duskra Security Node</strong>
           </p>
         </div>
         <div class="footer">
-          <p>&copy; ${year} Syncra Technologies Inc. All rights reserved.</p>
+          <p>&copy; ${year} Duskra Technologies Inc. All rights reserved.</p>
         </div>
       </div>
     </body>

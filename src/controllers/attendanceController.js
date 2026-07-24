@@ -1,7 +1,7 @@
 const { getIsConnected } = require('../config/db');
 const getTenantModel = require('../utils/tenantDb');
 const { fallbackAttendance } = require('../utils/fallbackStore');
-const { getCurrentMinutesInTimezone, getAttendanceTodayDate, formatAttendanceDate } = require('../utils/attendancePortalWindow');
+const { getCurrentMinutesInTimezone, getAttendanceTodayDate, formatAttendanceDate, processAutoCheckout } = require('../utils/attendancePortalWindow');
 
 async function getAttendance(req, res) {
   const companyId = req.user.companyId;
@@ -12,6 +12,11 @@ async function getAttendance(req, res) {
       const UserModel = getTenantModel(companyId, 'User');
       const CompanyModel = require('../models/Company');
 
+      const company = await CompanyModel.findById(companyId);
+      if (company) {
+        await processAutoCheckout(companyId, company, new Date());
+      }
+
       // Fetch all active employees
       const employees = await UserModel.find({ role: 'Employee', status: 'Active' });
 
@@ -19,7 +24,6 @@ async function getAttendance(req, res) {
       const list = await AttendanceModel.find({ companyId }).sort({ createdAt: -1 });
 
       // Check if we are past the portal close time for today
-      const company = await CompanyModel.findById(companyId);
       if (company) {
         const portalEnabled = company.attendancePortalEnabled !== false;
         const openTime = company.attendancePortalOpenTime || '09:00';

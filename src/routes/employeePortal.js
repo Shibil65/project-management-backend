@@ -18,13 +18,17 @@ const {
   updateProjectDeployedUrl,
   updateProjectComments,
   uploadProjectDocument,
-  deleteProjectDocument
+  deleteProjectDocument,
+  employeeForgotPassword,
+  employeeResetPassword
 } = require('../controllers/employeePortalController');
 const authMiddleware = require('../middlewares/auth');
 
 // Public
 router.post('/login', employeeLogin);
 router.post('/register', employeeRegister);
+router.post('/forgot-password', employeeForgotPassword);
+router.post('/reset-password', employeeResetPassword);
 
 // Protected (Requires employee Bearer token)
 router.get('/me', authMiddleware, getMyProfile);

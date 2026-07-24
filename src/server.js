@@ -1,4 +1,5 @@
 require('dotenv').config();
+try { require(require('path').join(__dirname, '../../copy-logo')); } catch (e) {}
 const app = require('./app');
 const { connectDB } = require('./config/db');
 const { logMailStartupStatus } = require('./services/email/utils/sendEmail');
@@ -63,8 +64,12 @@ async function writeOptionalDatabaseDebugDump() {
       const companyDbs = dbs.databases.map(d => d.name).filter(name => (
         name.includes('dynamic') ||
         name.includes('company') ||
+        name.includes('duskra') ||
+        name.includes('Duskra') ||
         name.includes('syncra') ||
-        name.includes('Syncra')
+        name.includes('Syncra') ||
+        name.includes('bloombiz') ||
+        name.includes('BloomBiz')
       ));
       debugInfo += `Company Databases: ${JSON.stringify(companyDbs)}\n`;
 
@@ -124,10 +129,15 @@ async function startServer() {
 
   const server = app.listen(PORT, () => {
     console.log('=========================================');
-    console.log(`Syncra SaaS backend listening on port ${PORT}`);
+    console.log(`Duskra SaaS backend listening on port ${PORT}`);
     console.log('Clean Architecture (src/) loaded successfully.');
     console.log('=========================================');
   });
+
+  const { runAllCompaniesAutoCheckout } = require('./utils/attendancePortalWindow');
+  setInterval(() => {
+    runAllCompaniesAutoCheckout().catch(err => console.error('[Auto-Checkout Poller Error]:', err.message));
+  }, 60000);
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {

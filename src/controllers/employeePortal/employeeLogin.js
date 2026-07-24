@@ -19,7 +19,7 @@ const {
   fallbackMessages,
   fallbackPlans
 } = require("../../utils/fallbackStore");
-const JWT_SECRET = process.env.JWT_SECRET || "syncra_secret_key_123";
+const JWT_SECRET = process.env.JWT_SECRET || "duskra_secret_key_123";
 
 function resolveFallbackUser(userId, email) {
   return fallbackUsers.find(u => (u._id || u.id) === userId) || email && fallbackUsers.find(u => u.email?.toLowerCase() === email.toLowerCase()) || null;
@@ -64,10 +64,14 @@ async function employeeLogin(req, res) {
     if (getIsConnected()) {
       user = await User.findOne({
         email: normalizedEmail,
-        role: "Employee"
+        role: { $in: ["Employee", "employee", "project_lead", "Project Lead"] }
       }).setOptions({ bypassTenant: true });
+
+      if (!user) {
+        user = await User.findOne({ email: normalizedEmail }).setOptions({ bypassTenant: true });
+      }
     } else {
-      user = fallbackUsers.find(u => u.email.toLowerCase() === normalizedEmail && u.role === "Employee") || null;
+      user = fallbackUsers.find(u => u.email.toLowerCase() === normalizedEmail) || null;
     }
     if (!user) {
       return res.status(401).json({

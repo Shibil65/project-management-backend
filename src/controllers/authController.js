@@ -380,7 +380,7 @@ async function verifyOtp(req, res) {
     org: loginUser.org,
   };
 
-  const token = jwt.sign(payload, process.env.JWT_SECRET || 'syncra_secret_key_123', { expiresIn: '14d' });
+  const token = jwt.sign(payload, process.env.JWT_SECRET || 'duskra_secret_key_123', { expiresIn: '14d' });
 
   return res.status(200).json({
     success: true,

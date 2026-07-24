@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const { getIsConnected } = require('../config/db');
 const SubscriptionPackage = require('../models/subscriptionPackage.model');
 const Company = require('../models/Company');
@@ -8,6 +9,8 @@ const { fallbackPlans, fallbackCompanies, fallbackUsers, fallbackPayments } = re
 const { defaultSeedPackages } = require('../seeders/subscriptionPackageSeeder');
 const { sendWelcomeCompanyEmail } = require('./email/emailService');
 const slugify = require('../utils/slugify');
+
+const escapeRegExp = (str) => String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Seeding helper for database
 async function ensureDbSeeded() {
@@ -61,7 +64,7 @@ const subscriptionPackageService = {
     const slug = data.slug ? slugify(data.slug) : slugify(name);
 
     if (getIsConnected()) {
-      const existing = await SubscriptionPackage.findOne({ name: new RegExp(`^${name}$`, 'i') });
+      const existing = await SubscriptionPackage.findOne({ name: new RegExp(`^${escapeRegExp(name)}$`, 'i') });
       if (existing) throw new Error('A plan package with this name already exists.');
 
       if (data.isPopular) {
@@ -116,22 +119,42 @@ const subscriptionPackageService = {
     updates.updatedBy = updaterEmail;
 
     if (getIsConnected()) {
-      const planDoc = await SubscriptionPackage.findById(id);
-      if (!planDoc) throw new Error('Subscription package not found.');
-
-      if (updates.isPopular) {
-        await SubscriptionPackage.updateMany({ _id: { $ne: id } }, { isPopular: false });
+      let planDoc = null;
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        planDoc = await SubscriptionPackage.findById(id);
+      }
+      if (!planDoc) {
+        planDoc = await SubscriptionPackage.findOne({ $or: [{ slug: id }, { name: new RegExp(`^${escapeRegExp(id)}$`, 'i') }] });
       }
 
-      Object.assign(planDoc, updates);
-      return await planDoc.save();
+      if (planDoc) {
+        if (updates.name) {
+          const existingOther = await SubscriptionPackage.findOne({
+            _id: { $ne: planDoc._id },
+            name: new RegExp(`^${escapeRegExp(updates.name)}$`, 'i')
+          });
+          if (existingOther) throw new Error('A plan package with this name already exists.');
+        }
+
+        if (updates.isPopular) {
+          await SubscriptionPackage.updateMany({ _id: { $ne: planDoc._id } }, { isPopular: false });
+        }
+
+        Object.assign(planDoc, updates);
+        return await planDoc.save();
+      }
     }
 
     checkAndSeedFallback();
-    const idx = fallbackPlans.findIndex(p => p.id === id);
+    const idx = fallbackPlans.findIndex(p => p.id === id || p._id === id);
     if (idx === -1) throw new Error('Subscription package not found.');
 
     const original = fallbackPlans[idx];
+    if (updates.name && updates.name.toLowerCase() !== original.name.toLowerCase()) {
+      const existingOther = fallbackPlans.find(p => (p.id !== id && p._id !== id) && p.name.toLowerCase() === updates.name.toLowerCase());
+      if (existingOther) throw new Error('A plan package with this name already exists.');
+    }
+
     if (updates.isPopular) {
       fallbackPlans.forEach(p => p.isPopular = false);
     }
@@ -151,13 +174,17 @@ const subscriptionPackageService = {
 
   async deletePackage(id) {
     if (getIsConnected()) {
-      const deleted = await SubscriptionPackage.findByIdAndDelete(id);
-      if (!deleted) throw new Error('Subscription package not found.');
-      return true;
+      let deleted = null;
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        deleted = await SubscriptionPackage.findByIdAndDelete(id);
+      } else {
+        deleted = await SubscriptionPackage.findOneAndDelete({ $or: [{ slug: id }] });
+      }
+      if (deleted) return true;
     }
 
     checkAndSeedFallback();
-    const idx = fallbackPlans.findIndex(p => p.id === id);
+    const idx = fallbackPlans.findIndex(p => p.id === id || p._id === id);
     if (idx === -1) throw new Error('Subscription package not found.');
     fallbackPlans.splice(idx, 1);
     return true;
@@ -165,14 +192,18 @@ const subscriptionPackageService = {
 
   async togglePackageStatus(id) {
     if (getIsConnected()) {
-      const planDoc = await SubscriptionPackage.findById(id);
-      if (!planDoc) throw new Error('Subscription package not found.');
-      planDoc.isActive = !planDoc.isActive;
-      return await planDoc.save();
+      let planDoc = null;
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        planDoc = await SubscriptionPackage.findById(id);
+      }
+      if (planDoc) {
+        planDoc.isActive = !planDoc.isActive;
+        return await planDoc.save();
+      }
     }
 
     checkAndSeedFallback();
-    const plan = fallbackPlans.find(p => p.id === id);
+    const plan = fallbackPlans.find(p => p.id === id || p._id === id);
     if (!plan) throw new Error('Subscription package not found.');
     plan.isActive = !plan.isActive;
     return plan;
@@ -180,15 +211,19 @@ const subscriptionPackageService = {
 
   async markPackagePopular(id) {
     if (getIsConnected()) {
-      const planDoc = await SubscriptionPackage.findById(id);
-      if (!planDoc) throw new Error('Subscription package not found.');
-      await SubscriptionPackage.updateMany({}, { isPopular: false });
-      planDoc.isPopular = true;
-      return await planDoc.save();
+      let planDoc = null;
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        planDoc = await SubscriptionPackage.findById(id);
+      }
+      if (planDoc) {
+        await SubscriptionPackage.updateMany({}, { isPopular: false });
+        planDoc.isPopular = true;
+        return await planDoc.save();
+      }
     }
 
     checkAndSeedFallback();
-    const plan = fallbackPlans.find(p => p.id === id);
+    const plan = fallbackPlans.find(p => p.id === id || p._id === id);
     if (!plan) throw new Error('Subscription package not found.');
     fallbackPlans.forEach(p => p.isPopular = false);
     plan.isPopular = true;
@@ -253,7 +288,7 @@ const subscriptionPackageService = {
       currency: 'INR',
       receipt: `sub_receipt_${Date.now()}`,
       payment_capture: 1,
-      notes: { plan: planName, source: 'Syncra SaaS Onboarding' }
+      notes: { plan: planName, source: 'Duskra SaaS Onboarding' }
     };
 
     const response = await fetch('https://api.razorpay.com/v1/orders', {

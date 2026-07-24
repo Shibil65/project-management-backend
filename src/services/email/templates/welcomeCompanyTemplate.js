@@ -7,8 +7,11 @@
  * @param {string} planName - Selected plan package tier.
  * @returns {string} Fully styled HTML template string.
  */
+const { getEmailHeader } = require('../utils/emailHeaderHelper');
+
 function welcomeCompanyTemplate(companyName, adminName, date, planName) {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const headerHtml = getEmailHeader('Duskra Workspace Ready', 'Plan. Collaborate. Deliver.');
   
   return `
     <!DOCTYPE html>
@@ -16,7 +19,7 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Welcome to Syncra</title>
+      <title>Welcome to Duskra</title>
       <style>
         body {
           margin: 0;
@@ -33,23 +36,6 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
           border-radius: 16px;
           overflow: hidden;
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-        }
-        .header {
-          background: linear-gradient(135deg, #2563EB, #1D4ED8);
-          padding: 32px;
-          text-align: center;
-          color: #ffffff;
-        }
-        .header h1 {
-          margin: 0;
-          font-size: 24px;
-          font-weight: 800;
-          letter-spacing: -0.5px;
-        }
-        .header p {
-          margin: 4px 0 0 0;
-          font-size: 14px;
-          opacity: 0.9;
         }
         .content {
           padding: 32px;
@@ -157,13 +143,10 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>Syncra Workspace Ready</h1>
-          <p>Task Manager Platform</p>
-        </div>
+        ${headerHtml}
         <div class="content">
           <p class="welcome-text">Hello <strong>${adminName}</strong>,</p>
-          <p class="welcome-text">Welcome to Syncra! Your company workspace has been successfully registered and is ready for use. You can now start managing projects, tracking attendance, and collaboration with your specialists.</p>
+          <p class="welcome-text">Welcome to Duskra! Your company workspace has been successfully registered and is ready for use. You can now start managing projects, tracking attendance, and collaboration with your specialists.</p>
           
           <div class="details-card">
             <h3>Workspace Details</h3>
@@ -203,12 +186,12 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
           </div>
           
           <p class="welcome-text" style="margin-top: 32px; font-size: 14px; color: #64748B;">
-            Need help? Reach our team at <a href="mailto:support@syncra.com" style="color: #2563EB; text-decoration: none;">support@syncra.com</a> or call +1 (800) 555-0199.
+            Need help? Reach our team at <a href="mailto:support@duskra.com" style="color: #2563EB; text-decoration: none;">support@duskra.com</a> or call +1 (800) 555-0199.
           </p>
           
           <p class="welcome-text" style="margin-bottom: 0;">
             Regards,<br>
-            <strong>Syncra Team</strong>
+            <strong>Duskra Team</strong>
           </p>
         </div>
         <div class="footer">
@@ -216,7 +199,7 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
             <a href="${frontendUrl}/privacy">Privacy Policy</a> &bull; 
             <a href="${frontendUrl}/support">Customer Support</a>
           </p>
-          <p>&copy; ${new Date().getFullYear()} Syncra Technologies Inc. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Duskra Technologies Inc. All rights reserved.</p>
         </div>
       </div>
     </body>

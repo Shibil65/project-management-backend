@@ -88,7 +88,7 @@ const startSession = asyncHandler(async (req, res) => {
   console.log(`[QR Session] Created session ID ${sessionIdStr} for company ${companyIdStr} by ${email}`);
 
   const qrPayload = {
-    type: 'SYNCRA_ATTENDANCE_QR',
+    type: 'DUSKRA_ATTENDANCE_QR',
     companyId: companyIdStr,
     sessionId: sessionIdStr,
     token: rawToken

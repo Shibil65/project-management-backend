@@ -6,6 +6,8 @@ const app = express();
 
 // Register global middlewares
 const allowedOrigins = [
+  'https://duskra-lime.vercel.app',
+  'https://bloombiz-lime.vercel.app',
   'https://syncra-lime.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000'
@@ -82,7 +84,14 @@ app.get('/api/system/metrics', (req, res) => {
   });
 });
 
-// Register Middleware Routers
+const { employeeForgotPassword, employeeResetPassword } = require('./controllers/employeePortal/forgotPassword');
+
+// Direct alias routes for forgot/reset password
+app.post('/api/employee-portal/forgot-password', employeeForgotPassword);
+app.post('/api/employee-portal/reset-password', employeeResetPassword);
+app.post('/api/forgot-password', employeeForgotPassword);
+app.post('/api/reset-password', employeeResetPassword);
+
 app.use('/api', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/projects', projectRoutes);
@@ -117,6 +126,15 @@ app.use((err, req, res, next) => {
     return res.status(400).json({
       success: false,
       message: Object.values(err.errors).map(e => e.message).join(', ')
+    });
+  }
+
+  // Mongo duplicate key error
+  if (err.code === 11000) {
+    const key = Object.keys(err.keyValue || {})[0] || 'field';
+    return res.status(400).json({
+      success: false,
+      message: `A subscription package with this ${key} already exists.`
     });
   }
 

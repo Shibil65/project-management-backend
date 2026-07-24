@@ -37,6 +37,7 @@ function parseRadius(value) {
 }
 
 function isValidTime(value) {
+  if (value === "" || value === null || value === undefined) return true;
   return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
@@ -127,6 +128,8 @@ function buildAttendanceSettings(reqBody, res) {
 
   if (reqBody.attendancePortalEnabled !== undefined) updates.attendancePortalEnabled = Boolean(reqBody.attendancePortalEnabled);
 
+  if (reqBody.manualCheckInEnabled !== undefined) updates.manualCheckInEnabled = Boolean(reqBody.manualCheckInEnabled);
+
   if (reqBody.attendancePortalOpenTime !== undefined) {
     if (!isValidTime(reqBody.attendancePortalOpenTime)) {
       res.status(400).json({ success: false, message: "Portal open time must use HH:mm format." });
@@ -180,29 +183,35 @@ async function selectPlan(req, res) {
       });
     }
   }
+
+  const updateFields = {};
+  if (plan !== undefined) updateFields.plan = plan;
+  if (enforcedUsers !== undefined) updateFields.users = enforcedUsers;
+  if (billing !== undefined) updateFields.billing = billing;
+  if (billingName !== undefined) updateFields.billingName = billingName;
+  if (billingEmail !== undefined) updateFields.billingEmail = billingEmail;
+  if (billingPhone !== undefined) updateFields.billingPhone = billingPhone;
+  if (billingAddress !== undefined) updateFields.billingAddress = billingAddress;
+  if (logo !== undefined) updateFields.logo = logo;
+  if (autopay !== undefined) updateFields.autopay = autopay;
+  Object.assign(updateFields, attendanceSettings);
+
   if (getIsConnected()) {
     try {
-      const company = await Company.findById(id);
+      const company = await Company.findByIdAndUpdate(
+        id,
+        { $set: updateFields },
+        { new: true, runValidators: true }
+      );
       if (!company) {
         return res.status(404).json({
           success: false,
           message: "Company not found."
         });
       }
-      if (plan !== undefined) company.plan = plan;
-      if (enforcedUsers !== undefined) company.users = enforcedUsers;
-      if (billing !== undefined) company.billing = billing;
-      if (billingName !== undefined) company.billingName = billingName;
-      if (billingEmail !== undefined) company.billingEmail = billingEmail;
-      if (billingPhone !== undefined) company.billingPhone = billingPhone;
-      if (billingAddress !== undefined) company.billingAddress = billingAddress;
-      if (logo !== undefined) company.logo = logo;
-      if (autopay !== undefined) company.autopay = autopay;
-      Object.assign(company, attendanceSettings);
-      await company.save();
       return res.status(200).json({
         success: true,
-        message: "Subscription, billing & GPS geofencing updated successfully.",
+        message: "Subscription, billing & attendance settings updated successfully.",
         data: company
       });
     } catch (err) {
@@ -213,18 +222,9 @@ async function selectPlan(req, res) {
       });
     }
   }
-  const company = fallbackCompanies.find(c => c.id === id);
+  const company = fallbackCompanies.find(c => String(c.id || c._id) === String(id));
   if (company) {
-    if (plan !== undefined) company.plan = plan;
-    if (enforcedUsers !== undefined) company.users = enforcedUsers;
-    if (billing !== undefined) company.billing = billing;
-    if (billingName !== undefined) company.billingName = billingName;
-    if (billingEmail !== undefined) company.billingEmail = billingEmail;
-    if (billingPhone !== undefined) company.billingPhone = billingPhone;
-    if (billingAddress !== undefined) company.billingAddress = billingAddress;
-    if (logo !== undefined) company.logo = logo;
-    if (autopay !== undefined) company.autopay = autopay;
-    Object.assign(company, attendanceSettings);
+    Object.assign(company, updateFields);
     return res.status(200).json({
       success: true,
       message: "Subscription & billing updated in fallback store.",

@@ -230,7 +230,7 @@ async function getAttendanceReport(req, res) {
     company = fallbackCompanies.find(c => c.id === companyId);
   }
   
-  const orgName = company ? company.name : (req.user.org || 'Syncra Organization');
+  const orgName = company ? company.name : (req.user.org || 'Duskra Organization');
   const openTime = company ? (company.attendancePortalOpenTime || '09:00') : '09:00';
   const closeTime = company ? (company.attendancePortalCloseTime || '18:00') : '18:00';
   const portalEnabled = company ? (company.attendancePortalEnabled !== false) : true;
@@ -382,7 +382,7 @@ async function getPaymentReport(req, res) {
 
   const pdf = createFormalReportPdf({
     title: 'Employee Payment Report',
-    subtitle: 'Formal payment ledger exported from Syncra SaaS',
+    subtitle: 'Formal payment ledger exported from Duskra SaaS',
     meta: [
       ['Employee', employeeName],
       ['Employee ID', employeeId],

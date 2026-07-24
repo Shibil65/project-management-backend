@@ -9,6 +9,7 @@ const {
 } = require("../../utils/fallbackStore");
 const {
   getAttendancePortalStatus,
+  processAutoCheckout,
   getAttendanceDateCandidates
 } = require("../../utils/attendancePortalWindow");
 
@@ -24,15 +25,17 @@ async function getTodayAttendance(req, res) {
     let companyDoc = null;
 
     if (getIsConnected()) {
+      companyDoc = await Company.findById(companyId);
+      await processAutoCheckout(companyId, companyDoc, now);
       const AttendanceModel = getTenantModel(companyId, "Attendance");
       record = await AttendanceModel.findOne({
         email,
         date: { $in: todayDateCandidates }
       });
-      companyDoc = await Company.findById(companyId);
     } else {
-      record = fallbackAttendance.find(a => a.email === email && todayDateCandidates.includes(a.date)) || null;
       companyDoc = fallbackCompanies.find(c => (c.id || c._id) === companyId) || null;
+      await processAutoCheckout(companyId, companyDoc, now);
+      record = fallbackAttendance.find(a => a.email === email && todayDateCandidates.includes(a.date)) || null;
     }
 
     const attendancePortal = getAttendancePortalStatus(companyDoc, now);

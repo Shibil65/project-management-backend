@@ -8,8 +8,12 @@
  * @param {string} portalUrl - Custom URL of the employee self-service login.
  * @returns {string} Fully styled HTML template string.
  */
+const { getEmailHeader } = require('../utils/emailHeaderHelper');
+
 function employeeCredentialsTemplate(employeeName, companyName, email, tempPassword, portalUrl) {
   const finalPortalUrl = portalUrl || 'http://localhost:5173/employee-portal';
+  const year = new Date().getFullYear();
+  const headerHtml = getEmailHeader(`Welcome to ${companyName}`, 'Duskra Platform Access');
 
   return `
     <!DOCTYPE html>
@@ -17,7 +21,7 @@ function employeeCredentialsTemplate(employeeName, companyName, email, tempPassw
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Welcome to ${companyName}</title>
+      <title>Your Employee Portal Credentials</title>
       <style>
         body {
           margin: 0;
@@ -34,23 +38,6 @@ function employeeCredentialsTemplate(employeeName, companyName, email, tempPassw
           border-radius: 16px;
           overflow: hidden;
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-        }
-        .header {
-          background: linear-gradient(135deg, #2563EB, #1D4ED8);
-          padding: 32px;
-          text-align: center;
-          color: #ffffff;
-        }
-        .header h1 {
-          margin: 0;
-          font-size: 24px;
-          font-weight: 800;
-          letter-spacing: -0.5px;
-        }
-        .header p {
-          margin: 4px 0 0 0;
-          font-size: 14px;
-          opacity: 0.9;
         }
         .content {
           padding: 32px;
@@ -148,10 +135,7 @@ function employeeCredentialsTemplate(employeeName, companyName, email, tempPassw
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <h1>Welcome to ${companyName}</h1>
-          <p>Task Manager Platform</p>
-        </div>
+        ${headerHtml}
         <div class="content">
           <p class="welcome-text">Hello <strong>${employeeName}</strong>,</p>
           <p class="welcome-text">Your employee account has been created successfully. You can now access the company Employee Portal using the temporary credentials detailed below.</p>
@@ -181,12 +165,12 @@ function employeeCredentialsTemplate(employeeName, companyName, email, tempPassw
           </div>
           
           <p class="welcome-text" style="font-size: 14px; color: #64748B;">
-            If you need assistance setting up your workspace, contact support at <a href="mailto:support@syncra.com" style="color: #2563EB; text-decoration: none;">support@syncra.com</a>.
+            If you need assistance setting up your workspace, contact support at <a href="mailto:support@duskra.com" style="color: #2563EB; text-decoration: none;">support@duskra.com</a>.
           </p>
           
           <p class="welcome-text" style="margin-bottom: 0;">
             Regards,<br>
-            <strong>Syncra Team</strong>
+            <strong>Duskra Team</strong>
           </p>
         </div>
         <div class="footer">
@@ -194,7 +178,7 @@ function employeeCredentialsTemplate(employeeName, companyName, email, tempPassw
             <a href="${finalPortalUrl}/privacy">Privacy Policy</a> &bull; 
             <a href="${finalPortalUrl}/support">Customer Support</a>
           </p>
-          <p>&copy; ${new Date().getFullYear()} Syncra Technologies Inc. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Duskra Technologies Inc. All rights reserved.</p>
         </div>
       </div>
     </body>

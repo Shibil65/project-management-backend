@@ -18,8 +18,8 @@ async function sendWelcomeCompanyEmail(to, companyName, adminName, planName) {
 
     await sendEmail({
       to,
-      subject: 'Your Syncra workspace is ready',
-      text: `Hello ${adminName || 'Admin'}, your Syncra workspace for ${companyName || 'your company'} is ready. Plan: ${planName || 'Selected plan'}.`,
+      subject: 'Your BloomBiz workspace is ready',
+      text: `Hello ${adminName || 'Admin'}, your BloomBiz workspace for ${companyName || 'your company'} is ready. Plan: ${planName || 'Selected plan'}.`,
       html
     });
 
@@ -47,8 +47,8 @@ async function sendEmployeeCredentialsEmail(to, employeeName, companyName, tempP
 
     await sendEmail({
       to,
-      subject: 'Syncra employee portal access',
-      text: `Hi ${employeeName || 'Team member'}, you have been added to ${companyName || 'your Syncra workspace'}. Portal: ${portalUrl}. Login email: ${to}. Temporary password: ${tempPassword}. Please change your password after logging in.`,
+      subject: 'BloomBiz employee portal access',
+      text: `Hi ${employeeName || 'Team member'}, you have been added to ${companyName || 'your BloomBiz workspace'}. Portal: ${portalUrl}. Login email: ${to}. Temporary password: ${tempPassword}. Please change your password after logging in.`,
       html,
       replyTo: companyEmail || process.env.SMTP_USER
     });
