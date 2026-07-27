@@ -88,7 +88,7 @@ const startSession = asyncHandler(async (req, res) => {
   console.log(`[QR Session] Created session ID ${sessionIdStr} for company ${companyIdStr} by ${email}`);
 
   const qrPayload = {
-    type: 'DUSKRA_ATTENDANCE_QR',
+    type: 'FLOWNEX_ATTENDANCE_QR',
     companyId: companyIdStr,
     sessionId: sessionIdStr,
     token: rawToken
@@ -169,10 +169,12 @@ const getSessionStatus = asyncHandler(async (req, res) => {
     await qrService.saveSession(session, false);
   }
 
-  // Heartbeat timeout check (30 seconds)
-  const requireHeartbeat = settings ? settings.requireAdminPortalHeartbeat : true;
+  // Heartbeat timeout check (90s tolerance)
+  const requireHeartbeat = settings ? settings.requireAdminPortalHeartbeat !== false : true;
   const heartbeatDiff = now - new Date(session.lastHeartbeatAt).getTime();
-  const timeoutMs = ((settings ? settings.heartbeatTimeoutSeconds : 30) || 30) * 1000;
+  const configuredTimeoutSecs = settings ? settings.heartbeatTimeoutSeconds : 90;
+  const timeoutMs = Math.max((configuredTimeoutSecs || 90) * 1000, 90000);
+
   if (isActive && status === 'active' && requireHeartbeat && heartbeatDiff > timeoutMs) {
     isActive = false;
     status = 'expired';
@@ -254,9 +256,11 @@ const verifyToken = asyncHandler(async (req, res) => {
     await qrService.saveSession(session, false);
   }
 
-  const requireHeartbeat = settings.requireAdminPortalHeartbeat;
+  const requireHeartbeat = settings ? settings.requireAdminPortalHeartbeat !== false : true;
   const heartbeatDiff = now - new Date(session.lastHeartbeatAt).getTime();
-  const timeoutMs = (settings.heartbeatTimeoutSeconds || 30) * 1000;
+  const configuredTimeoutSecs = settings ? settings.heartbeatTimeoutSeconds : 90;
+  const timeoutMs = Math.max((configuredTimeoutSecs || 90) * 1000, 90000);
+
   if (isActive && status === 'active' && requireHeartbeat && heartbeatDiff > timeoutMs) {
     isActive = false;
     status = 'expired';
@@ -266,7 +270,10 @@ const verifyToken = asyncHandler(async (req, res) => {
   }
 
   const expiryDiff = new Date(session.expiresAt).getTime() - now;
-  if (isActive && status === 'active' && expiryDiff <= 0) {
+  // 120s grace period for dynamic 15-second QR rotation
+  const isWithinGracePeriod = Math.abs(expiryDiff) <= 120000;
+
+  if (isActive && status === 'active' && expiryDiff <= 0 && !isWithinGracePeriod) {
     isActive = false;
     status = 'expired';
     session.isActive = false;
@@ -274,7 +281,7 @@ const verifyToken = asyncHandler(async (req, res) => {
     await qrService.saveSession(session, false);
   }
 
-  if (!isActive || status !== 'active') {
+  if ((!isActive || status !== 'active') && !isWithinGracePeriod) {
     return res.status(400).json({
       success: false,
       message: status === 'closed' ? 'Attendance QR portal is closed.' : 'QR expired. Please scan the latest QR.'

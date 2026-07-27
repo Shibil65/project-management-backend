@@ -6,6 +6,7 @@ const app = express();
 
 // Register global middlewares
 const allowedOrigins = [
+  'https://flownex-lime.vercel.app',
   'https://duskra-lime.vercel.app',
   'https://bloombiz-lime.vercel.app',
   'https://syncra-lime.vercel.app',

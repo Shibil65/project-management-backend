@@ -5,7 +5,7 @@ const User = require("../../models/User");
 const { fallbackUsers } = require("../../utils/fallbackStore");
 const { sendPasswordResetEmail } = require("../../services/emailService");
 
-const JWT_SECRET = process.env.JWT_SECRET || "duskra_secret_key_123";
+const JWT_SECRET = process.env.JWT_SECRET || "flownex_secret_key_123";
 
 /**
  * Handles employee request to reset password.

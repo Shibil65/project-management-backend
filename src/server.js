@@ -64,6 +64,8 @@ async function writeOptionalDatabaseDebugDump() {
       const companyDbs = dbs.databases.map(d => d.name).filter(name => (
         name.includes('dynamic') ||
         name.includes('company') ||
+        name.includes('flownex') ||
+        name.includes('Flownex') ||
         name.includes('duskra') ||
         name.includes('Duskra') ||
         name.includes('syncra') ||
@@ -129,7 +131,7 @@ async function startServer() {
 
   const server = app.listen(PORT, () => {
     console.log('=========================================');
-    console.log(`Duskra SaaS backend listening on port ${PORT}`);
+    console.log(`Flownex backend listening on port ${PORT}`);
     console.log('Clean Architecture (src/) loaded successfully.');
     console.log('=========================================');
   });

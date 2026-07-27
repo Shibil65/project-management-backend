@@ -19,9 +19,6 @@ const getSettings = asyncHandler(async (req, res) => {
         createdBy: email
       });
       await settings.save();
-    } else if (settings.qrExpiresInMinutes < 30) {
-      settings.qrExpiresInMinutes = 30;
-      await settings.save();
     }
     return res.status(200).json({ success: true, data: settings });
   }
@@ -39,8 +36,6 @@ const getSettings = asyncHandler(async (req, res) => {
       updatedAt: new Date()
     };
     fallbackAttendanceSettings.push(settings);
-  } else if (settings.qrExpiresInMinutes < 30) {
-    settings.qrExpiresInMinutes = 30;
   }
   return res.status(200).json({ success: true, data: settings });
 });
@@ -58,7 +53,10 @@ const updateSettings = asyncHandler(async (req, res) => {
     }
     
     if (qrAttendanceEnabled !== undefined) settings.qrAttendanceEnabled = !!qrAttendanceEnabled;
-    if (qrExpiresInMinutes !== undefined) settings.qrExpiresInMinutes = Math.max(30, Number(qrExpiresInMinutes));
+    if (qrExpiresInMinutes !== undefined) {
+      const val = Number(qrExpiresInMinutes);
+      settings.qrExpiresInMinutes = (!isNaN(val) && val >= 0.1) ? val : 30;
+    }
     if (requireAdminPortalHeartbeat !== undefined) settings.requireAdminPortalHeartbeat = !!requireAdminPortalHeartbeat;
     if (heartbeatTimeoutSeconds !== undefined) settings.heartbeatTimeoutSeconds = Number(heartbeatTimeoutSeconds);
     settings.updatedBy = email;
@@ -75,7 +73,10 @@ const updateSettings = asyncHandler(async (req, res) => {
   }
 
   if (qrAttendanceEnabled !== undefined) settings.qrAttendanceEnabled = !!qrAttendanceEnabled;
-  if (qrExpiresInMinutes !== undefined) settings.qrExpiresInMinutes = Math.max(30, Number(qrExpiresInMinutes));
+  if (qrExpiresInMinutes !== undefined) {
+    const val = Number(qrExpiresInMinutes);
+    settings.qrExpiresInMinutes = (!isNaN(val) && val >= 0.1) ? val : 30;
+  }
   if (requireAdminPortalHeartbeat !== undefined) settings.requireAdminPortalHeartbeat = !!requireAdminPortalHeartbeat;
   if (heartbeatTimeoutSeconds !== undefined) settings.heartbeatTimeoutSeconds = Number(heartbeatTimeoutSeconds);
   settings.updatedBy = email;

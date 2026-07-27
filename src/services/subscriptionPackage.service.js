@@ -288,7 +288,7 @@ const subscriptionPackageService = {
       currency: 'INR',
       receipt: `sub_receipt_${Date.now()}`,
       payment_capture: 1,
-      notes: { plan: planName, source: 'Duskra SaaS Onboarding' }
+      notes: { plan: planName, source: 'Flownex SaaS Onboarding' }
     };
 
     const response = await fetch('https://api.razorpay.com/v1/orders', {

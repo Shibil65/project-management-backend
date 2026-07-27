@@ -1,21 +1,8 @@
-/**
- * Generates the HTML OTP Verification email template.
- * 
- * Deliverability Tip (DNS Records):
- * Ensure your sending domain has SPF, DKIM, and DMARC records configured:
- * 1. SPF: v=spf1 include:sendgrid.net include:_spf.google.com ~all
- * 2. DKIM: Create a TXT record with selector and key provided by your mail provider (e.g. Gmail/SendGrid).
- * 3. DMARC: v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc-reports@yourdomain.com
- * 
- * @param {string} otpCodeCode - The secure 6-digit OTP code.
- * @param {number} expiryMinutes - Expiry time in minutes.
- * @returns {string} Fully styled HTML template string.
- */
 const { getEmailHeader } = require('../utils/emailHeaderHelper');
 
 function otpEmailTemplate(otpCodeCode, expiryMinutes = 10) {
   const year = new Date().getFullYear();
-  const headerHtml = getEmailHeader('Duskra Security Portal', 'Verification Code');
+  const headerHtml = getEmailHeader('Flownex Security Portal', 'Verification Code');
 
   return `
     <!DOCTYPE html>
@@ -23,7 +10,7 @@ function otpEmailTemplate(otpCodeCode, expiryMinutes = 10) {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Duskra Verification Code</title>
+      <title>Your Flownex verification code</title>
       <style>
         body {
           margin: 0;
@@ -65,7 +52,7 @@ function otpEmailTemplate(otpCodeCode, expiryMinutes = 10) {
           text-align: center;
           font-size: 36px;
           font-weight: 800;
-          color: #4F46E5;
+          color: #4F63F5;
           letter-spacing: 6px;
           margin: 28px 0;
           font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
@@ -95,25 +82,26 @@ function otpEmailTemplate(otpCodeCode, expiryMinutes = 10) {
         ${headerHtml}
         <div class="content">
           <h2 class="title">Verification Code</h2>
-          <p class="text">Use the secure verification code below to authorize your login request on the Duskra Portal.</p>
+          <p class="text">Use the secure verification code below to authorize your login request on the Flownex Portal.</p>
           
           <div class="otp-box">${otpCodeCode}</div>
           
           <p class="text" style="font-size: 13px; color: #64748B;">
-            This passcode will expire in <strong>${expiryMinutes} minutes</strong>. If you did not make this request, you can safely ignore this email.
+            This passcode will expire in <strong>${expiryMinutes} minutes</strong>. If you did not request this action, you can safely ignore this email or contact your administrator.
           </p>
           
           <div class="warning-box">
-            <strong>Security Warning:</strong> Do not share this OTP with anyone. Duskra administrators will never ask for your verification passcode.
+            <strong>Security Warning:</strong> Do not share this OTP with anyone. Flownex administrators will never ask for your verification passcode.
           </div>
           
           <p class="text" style="margin-bottom: 0; font-size: 13px; margin-top: 24px;">
             Regards,<br>
-            <strong>Duskra Security Node</strong>
+            <strong>Flownex Security Node</strong>
           </p>
         </div>
         <div class="footer">
-          <p>&copy; ${year} Duskra Technologies Inc. All rights reserved.</p>
+          <p>&copy; ${year} Flownex. All rights reserved.</p>
+          <p style="font-size: 11px; margin-top: 4px;">This is an automated email from Flownex. Please do not reply unless the email specifically supports replies.</p>
         </div>
       </div>
     </body>

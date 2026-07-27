@@ -1,16 +1,8 @@
 const { getEmailHeader } = require('../utils/emailHeaderHelper');
 
-/**
- * Generates the HTML password reset link email template.
- * 
- * @param {string} resetLink - Full reset token web URL.
- * @param {string} email - Target employee/user email address.
- * @param {number} expiryMinutes - Token expiration length in minutes.
- * @returns {string} Fully styled HTML template string.
- */
 function passwordResetTemplate(resetLink, email, expiryMinutes = 30) {
   const year = new Date().getFullYear();
-  const headerHtml = getEmailHeader('Duskra Security Portal', 'Password Reset Request');
+  const headerHtml = getEmailHeader('Flownex Security Portal', 'Password Reset Request');
 
   return `
     <!DOCTYPE html>
@@ -18,7 +10,7 @@ function passwordResetTemplate(resetLink, email, expiryMinutes = 30) {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Duskra Password Reset</title>
+      <title>Reset your Flownex password</title>
       <style>
         body {
           margin: 0;
@@ -57,14 +49,14 @@ function passwordResetTemplate(resetLink, email, expiryMinutes = 30) {
         }
         .btn {
           display: inline-block;
-          background-color: #7546E8;
+          background: linear-gradient(135deg, #4F63F5 0%, #20B7C9 100%);
           color: #ffffff !important;
           text-decoration: none;
           padding: 14px 28px;
           border-radius: 8px;
           font-weight: 700;
           font-size: 14px;
-          box-shadow: 0 4px 6px -1px rgba(117, 70, 232, 0.25);
+          box-shadow: 0 4px 6px -1px rgba(79, 99, 245, 0.25);
         }
         .warning-box {
           background-color: #FFFBEB;
@@ -103,7 +95,7 @@ function passwordResetTemplate(resetLink, email, expiryMinutes = 30) {
         <div class="content">
           <div class="greeting">Hello,</div>
           <div class="text">
-            We received a request to reset your password for your Duskra Employee Workspace account (<strong>${email}</strong>).
+            We received a request to reset your password for your Flownex account (<strong>${email}</strong>).
           </div>
 
           <div class="btn-container">
@@ -111,11 +103,11 @@ function passwordResetTemplate(resetLink, email, expiryMinutes = 30) {
           </div>
 
           <div class="text" style="font-size: 13px; color: #64748B;">
-            This link is valid for <strong>${expiryMinutes} minutes</strong>. If you did not request a password reset, no action is needed.
+            This link is valid for <strong>${expiryMinutes} minutes</strong>. If you did not request this action, you can safely ignore this email or contact your administrator.
           </div>
 
           <div class="warning-box">
-            <strong>Security Notice:</strong> Never forward this reset email to anyone.
+            <strong>Security Notice:</strong> Never forward this password reset email to anyone.
           </div>
 
           <div class="text" style="font-size: 12px; color: #94A3B8; margin-top: 20px;">
@@ -125,7 +117,8 @@ function passwordResetTemplate(resetLink, email, expiryMinutes = 30) {
         </div>
 
         <div class="footer">
-          <p>&copy; ${year} Duskra Platform. All rights reserved.</p>
+          <p>&copy; ${year} Flownex. All rights reserved.</p>
+          <p style="font-size: 11px; margin-top: 4px;">This is an automated email from Flownex. Please do not reply unless the email specifically supports replies.</p>
         </div>
       </div>
     </body>

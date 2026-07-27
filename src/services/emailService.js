@@ -64,8 +64,8 @@ async function sendEmailOtp(email, otp) {
 
     await sendEmail({
       to: email,
-      subject: 'Duskra Verification Code',
-      text: `Your Duskra verification code is ${otp}. It expires in 10 minutes. If you did not request this code, ignore this email.`,
+      subject: 'Your Flownex verification code',
+      text: `Your Flownex verification code is ${otp}. It expires in 10 minutes. If you did not request this code, ignore this email.`,
       html,
       headers: { 'X-Priority': '1', 'Importance': 'high' }
     });
@@ -109,8 +109,8 @@ async function sendWelcomeEmail(adminEmail, adminName, companyName) {
 
     await sendEmail({
       to: adminEmail,
-      subject: `Your Duskra workspace is ready: ${companyName}`,
-      text: `Hello ${adminName || 'Admin'}, your Duskra workspace for ${companyName || 'your company'} is ready. Open ${process.env.FRONTEND_URL || 'http://localhost:5173'} and request an OTP to sign in.`,
+      subject: `Welcome to Flownex: ${companyName}`,
+      text: `Hello ${adminName || 'Admin'}, your Flownex workspace for ${companyName || 'your company'} is ready. Open ${process.env.FRONTEND_URL || 'http://localhost:5173'} and request an OTP to sign in.`,
       html
     });
 
@@ -141,8 +141,8 @@ async function sendEmployeeInviteEmail(email, name, role, portalUrl, tempPasswor
 
     await sendEmail({
       to: email,
-      subject: 'Duskra workspace invitation',
-      text: `Hi ${name || 'Team member'}, you have been added to ${companyName || 'your Duskra workspace'} as ${role || 'Employee'}. Portal: ${portalUrl}. Login email: ${email}. Temporary password: ${tempPassword}. Please change your password after logging in.`,
+      subject: 'You have been invited to Flownex',
+      text: `Hi ${name || 'Team member'}, you have been added to ${companyName || 'your Flownex workspace'} as ${role || 'Employee'}. Portal: ${portalUrl}. Login email: ${email}. Temporary password: ${tempPassword}. Please change your password after logging in.`,
       html,
       replyTo: companyEmail
     });
@@ -177,7 +177,7 @@ async function sendPasswordResetEmail(email, resetUrl) {
 
     await sendEmail({
       to: email,
-      subject: 'Reset Your Password - Duskra Employee Workspace',
+      subject: 'Reset your Flownex password',
       text: `Hello, we received a request to reset your password. Open this link to set a new password: ${resetUrl}. This link will expire in 1 hour.`,
       html
     });

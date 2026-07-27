@@ -1,7 +1,7 @@
 const { getIsConnected } = require('../config/db');
 const getTenantModel = require('../utils/tenantDb');
 const { fallbackAttendance } = require('../utils/fallbackStore');
-const { getCurrentMinutesInTimezone, getAttendanceTodayDate, formatAttendanceDate, processAutoCheckout } = require('../utils/attendancePortalWindow');
+const { getCurrentMinutesInTimezone, getAttendanceTodayDate, formatAttendanceDate, processAutoCheckout, getAttendanceDateCandidates } = require('../utils/attendancePortalWindow');
 
 async function getAttendance(req, res) {
   const companyId = req.user.companyId;
@@ -93,15 +93,21 @@ async function adminMarkAttendance(req, res) {
     return res.status(400).json({ success: false, message: 'Employee Email, Date, and Check In Time are required.' });
   }
 
-  let formattedDate = date;
-  try {
-    const d = new Date(date);
-    if (!isNaN(d.getTime())) {
-      // Format to match localized string in DB: e.g. "Jun 29, 2026"
-      formattedDate = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
-  } catch (e) {
-    console.error("Date formatting failed:", e);
+  let targetDate;
+  if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [y, m, d] = date.split('-').map(Number);
+    targetDate = new Date(y, m - 1, d);
+  } else {
+    targetDate = new Date(date);
+  }
+
+  const primaryDateStr = formatAttendanceDate(targetDate);
+  const dateCandidates = getAttendanceDateCandidates(targetDate);
+  if (!dateCandidates.includes(date)) {
+    dateCandidates.push(date);
+  }
+  if (!dateCandidates.includes(primaryDateStr)) {
+    dateCandidates.push(primaryDateStr);
   }
 
   let duration = '';
@@ -148,8 +154,8 @@ async function adminMarkAttendance(req, res) {
 
       const AttendanceModel = getTenantModel(companyId, 'Attendance');
       let attendanceRecord = await AttendanceModel.findOne({
-        email: employee.email,
-        date: formattedDate
+        email: employee.email.toLowerCase(),
+        date: { $in: dateCandidates }
       });
 
       if (attendanceRecord) {
@@ -161,6 +167,7 @@ async function adminMarkAttendance(req, res) {
         // Admin manually registered check-in, transition status to Present (Approved)
         attendanceRecord.status = 'Approved';
         attendanceRecord.remarks = 'Manually registered by Administrator';
+        attendanceRecord.verificationMethod = 'manual';
         
         await attendanceRecord.save();
         return res.status(200).json({ success: true, data: attendanceRecord });
@@ -170,10 +177,13 @@ async function adminMarkAttendance(req, res) {
           email: employee.email,
           companyId,
           org: req.user.org || employee.org || 'Company',
-          date: formattedDate,
+          date: primaryDateStr,
           checkIn,
           checkOut: checkOut || '',
-          duration
+          duration,
+          status: 'Approved',
+          remarks: 'Manually registered by Administrator',
+          verificationMethod: 'manual'
         });
 
         await newAttendance.save();
@@ -191,13 +201,20 @@ async function adminMarkAttendance(req, res) {
     return res.status(404).json({ success: false, message: 'Employee not found in fallback store.' });
   }
 
-  const existingIndex = fallbackAttendance.findIndex(a => a.email.toLowerCase() === employee.email.toLowerCase() && a.date === formattedDate);
+  const existingIndex = fallbackAttendance.findIndex(a => 
+    a.email.toLowerCase() === employee.email.toLowerCase() && 
+    (dateCandidates.includes(a.date) || a.date === date)
+  );
+
   if (existingIndex !== -1) {
     if (checkIn) fallbackAttendance[existingIndex].checkIn = checkIn;
     if (checkOut !== undefined) {
       fallbackAttendance[existingIndex].checkOut = checkOut;
       fallbackAttendance[existingIndex].duration = duration;
     }
+    fallbackAttendance[existingIndex].status = 'Approved';
+    fallbackAttendance[existingIndex].remarks = 'Manually registered by Administrator';
+    fallbackAttendance[existingIndex].verificationMethod = 'manual';
     return res.status(200).json({ success: true, data: fallbackAttendance[existingIndex] });
   }
 
@@ -207,10 +224,13 @@ async function adminMarkAttendance(req, res) {
     email: employee.email,
     companyId,
     org: req.user.org || employee.org || 'Company',
-    date: formattedDate,
+    date: primaryDateStr,
     checkIn,
     checkOut: checkOut || '',
-    duration
+    duration,
+    status: 'Approved',
+    remarks: 'Manually registered by Administrator',
+    verificationMethod: 'manual'
   };
 
   fallbackAttendance.push(newAttendance);

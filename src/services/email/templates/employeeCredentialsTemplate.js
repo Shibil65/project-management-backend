@@ -1,19 +1,9 @@
-/**
- * Generates the HTML welcome email template with credentials for new employees.
- * 
- * @param {string} employeeName - New employee's name.
- * @param {string} companyName - Registering company organization name.
- * @param {string} email - Employee login email identifier.
- * @param {string} tempPassword - Plain text temporary password.
- * @param {string} portalUrl - Custom URL of the employee self-service login.
- * @returns {string} Fully styled HTML template string.
- */
 const { getEmailHeader } = require('../utils/emailHeaderHelper');
 
 function employeeCredentialsTemplate(employeeName, companyName, email, tempPassword, portalUrl) {
   const finalPortalUrl = portalUrl || 'http://localhost:5173/employee-portal';
   const year = new Date().getFullYear();
-  const headerHtml = getEmailHeader(`Welcome to ${companyName}`, 'Duskra Platform Access');
+  const headerHtml = getEmailHeader(`Welcome to ${companyName || 'Flownex'}`, 'Flownex Platform Access');
 
   return `
     <!DOCTYPE html>
@@ -95,15 +85,14 @@ function employeeCredentialsTemplate(employeeName, companyName, email, tempPassw
         }
         .btn {
           display: inline-block;
-          background-color: #2563EB;
+          background: linear-gradient(135deg, #4F63F5 0%, #20B7C9 100%);
           color: #ffffff !important;
           text-decoration: none;
-          padding: 12px 24px;
+          padding: 14px 28px;
           border-radius: 8px;
           font-weight: 700;
           font-size: 14px;
-          box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
-          transition: background-color 0.2s;
+          box-shadow: 0 4px 6px -1px rgba(79, 99, 245, 0.25);
         }
         .warning-box {
           background-color: #FFFBEB;
@@ -144,7 +133,7 @@ function employeeCredentialsTemplate(employeeName, companyName, email, tempPassw
             <h3>Login Credentials</h3>
             <div class="details-row">
               <span class="details-label">Portal URL</span>
-              <span class="details-value"><a href="${finalPortalUrl}" style="color: #2563EB; text-decoration: none;">${finalPortalUrl}</a></span>
+              <span class="details-value"><a href="${finalPortalUrl}" style="color: #4F63F5; text-decoration: none;">${finalPortalUrl}</a></span>
             </div>
             <div class="details-row">
               <span class="details-label">Login Email</span>
@@ -165,12 +154,12 @@ function employeeCredentialsTemplate(employeeName, companyName, email, tempPassw
           </div>
           
           <p class="welcome-text" style="font-size: 14px; color: #64748B;">
-            If you need assistance setting up your workspace, contact support at <a href="mailto:support@duskra.com" style="color: #2563EB; text-decoration: none;">support@duskra.com</a>.
+            If you need assistance setting up your workspace, contact support at <a href="mailto:support@flownex.com" style="color: #4F63F5; text-decoration: none;">support@flownex.com</a>.
           </p>
           
           <p class="welcome-text" style="margin-bottom: 0;">
             Regards,<br>
-            <strong>Duskra Team</strong>
+            <strong>Flownex Team</strong>
           </p>
         </div>
         <div class="footer">
@@ -178,7 +167,8 @@ function employeeCredentialsTemplate(employeeName, companyName, email, tempPassw
             <a href="${finalPortalUrl}/privacy">Privacy Policy</a> &bull; 
             <a href="${finalPortalUrl}/support">Customer Support</a>
           </p>
-          <p>&copy; ${new Date().getFullYear()} Duskra Technologies Inc. All rights reserved.</p>
+          <p>&copy; ${year} Flownex. All rights reserved.</p>
+          <p style="font-size: 11px; margin-top: 4px;">This is an automated email from Flownex. Please do not reply unless the email specifically supports replies.</p>
         </div>
       </div>
     </body>

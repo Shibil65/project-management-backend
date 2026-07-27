@@ -125,12 +125,16 @@ async function authMiddleware(req, res, next) {
   try {
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'duskra_secret_key_123');
-    } catch (jwtErr) {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'flownex_secret_key_123');
+    } catch (jwtErr0) {
       try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET || 'syncra_secret_key_123');
-      } catch (jwtErr2) {
-        decoded = jwt.verify(token, process.env.JWT_SECRET || 'bloombiz_secret_key_123');
+        decoded = jwt.verify(token, process.env.JWT_SECRET || 'duskra_secret_key_123');
+      } catch (jwtErr) {
+        try {
+          decoded = jwt.verify(token, process.env.JWT_SECRET || 'syncra_secret_key_123');
+        } catch (jwtErr2) {
+          decoded = jwt.verify(token, process.env.JWT_SECRET || 'bloombiz_secret_key_123');
+        }
       }
     }
     let resolved;

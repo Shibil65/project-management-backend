@@ -1,17 +1,8 @@
-/**
- * Generates the HTML welcome email template for new companies.
- * 
- * @param {string} companyName - The registered company's name.
- * @param {string} adminName - The company administrator's name.
- * @param {string} date - Registration date string.
- * @param {string} planName - Selected plan package tier.
- * @returns {string} Fully styled HTML template string.
- */
 const { getEmailHeader } = require('../utils/emailHeaderHelper');
 
 function welcomeCompanyTemplate(companyName, adminName, date, planName) {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const headerHtml = getEmailHeader('Duskra Workspace Ready', 'Plan. Collaborate. Deliver.');
+  const headerHtml = getEmailHeader('Flownex Workspace Ready', 'Smarter Project and Team Management');
   
   return `
     <!DOCTYPE html>
@@ -19,7 +10,7 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Welcome to Duskra</title>
+      <title>Welcome to Flownex</title>
       <style>
         body {
           margin: 0;
@@ -85,15 +76,14 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
         }
         .btn {
           display: inline-block;
-          background-color: #2563EB;
+          background: linear-gradient(135deg, #4F63F5 0%, #20B7C9 100%);
           color: #ffffff !important;
           text-decoration: none;
-          padding: 12px 24px;
+          padding: 14px 28px;
           border-radius: 8px;
           font-weight: 700;
           font-size: 14px;
-          box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
-          transition: background-color 0.2s;
+          box-shadow: 0 4px 6px -1px rgba(79, 99, 245, 0.25);
         }
         .getting-started {
           margin-top: 32px;
@@ -116,8 +106,8 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
           width: 20px;
           height: 20px;
           line-height: 20px;
-          background-color: #E0F2FE;
-          color: #0369A1;
+          background-color: #EEF2FF;
+          color: #4F63F5;
           border-radius: 50%;
           text-align: center;
           font-weight: 700;
@@ -146,7 +136,7 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
         ${headerHtml}
         <div class="content">
           <p class="welcome-text">Hello <strong>${adminName}</strong>,</p>
-          <p class="welcome-text">Welcome to Duskra! Your company workspace has been successfully registered and is ready for use. You can now start managing projects, tracking attendance, and collaboration with your specialists.</p>
+          <p class="welcome-text">Welcome to Flownex! Your company workspace has been successfully registered and is ready for use. You can now start managing projects, tracking attendance, and collaborating with your team.</p>
           
           <div class="details-card">
             <h3>Workspace Details</h3>
@@ -164,7 +154,7 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
             </div>
             <div class="details-row">
               <span class="details-label">Active Plan</span>
-              <span class="details-value" style="color: #16A34A;">${planName}</span>
+              <span class="details-value" style="color: #12C6A3;">${planName}</span>
             </div>
           </div>
 
@@ -181,17 +171,17 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
               <span class="step-num">2</span> Set up employee profiles under the "Employees" tab.
             </div>
             <div class="step">
-              <span class="step-num">3</span> Create projects and assign staff members to get work underway.
+              <span class="step-num">3</span> Create projects and assign team members to get work underway.
             </div>
           </div>
           
           <p class="welcome-text" style="margin-top: 32px; font-size: 14px; color: #64748B;">
-            Need help? Reach our team at <a href="mailto:support@duskra.com" style="color: #2563EB; text-decoration: none;">support@duskra.com</a> or call +1 (800) 555-0199.
+            Need help? Reach our team at <a href="mailto:support@flownex.com" style="color: #4F63F5; text-decoration: none;">support@flownex.com</a>.
           </p>
           
           <p class="welcome-text" style="margin-bottom: 0;">
             Regards,<br>
-            <strong>Duskra Team</strong>
+            <strong>Flownex Team</strong>
           </p>
         </div>
         <div class="footer">
@@ -199,7 +189,8 @@ function welcomeCompanyTemplate(companyName, adminName, date, planName) {
             <a href="${frontendUrl}/privacy">Privacy Policy</a> &bull; 
             <a href="${frontendUrl}/support">Customer Support</a>
           </p>
-          <p>&copy; ${new Date().getFullYear()} Duskra Technologies Inc. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Flownex. All rights reserved.</p>
+          <p style="font-size: 11px; margin-top: 4px;">This is an automated email from Flownex. Please do not reply unless the email specifically supports replies.</p>
         </div>
       </div>
     </body>

@@ -10,14 +10,14 @@ const mailConfig = {
     secure: process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
-    fromName: process.env.SMTP_FROM_NAME || 'Duskra',
+    fromName: process.env.EMAIL_FROM_NAME || process.env.BRAND_NAME || process.env.SMTP_FROM_NAME || 'Flownex',
     fromEmail: process.env.SMTP_FROM_EMAIL || ''
   },
 
   // API Mode Config
   api: {
     key: process.env.BREVO_API_KEY || '',
-    senderName: process.env.BREVO_SENDER_NAME || 'Duskra',
+    senderName: process.env.EMAIL_FROM_NAME || process.env.BRAND_NAME || process.env.BREVO_SENDER_NAME || 'Flownex',
     senderEmail: process.env.BREVO_SENDER_EMAIL || ''
   },
 

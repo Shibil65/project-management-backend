@@ -19,7 +19,7 @@ const {
   fallbackMessages,
   fallbackPlans
 } = require("../../utils/fallbackStore");
-const JWT_SECRET = process.env.JWT_SECRET || "duskra_secret_key_123";
+const JWT_SECRET = process.env.JWT_SECRET || "flownex_secret_key_123";
 const { validatePassword } = require("../../utils/passwordPolicy");
 
 function resolveFallbackUser(userId, email) {
