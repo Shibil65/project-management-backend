@@ -49,6 +49,7 @@ const subscriptionPackageRoutes = require('./routes/subscriptionPackage.routes')
 const superAdminSubscriptionPackageRoutes = require('./routes/superAdminSubscriptionPackage.routes');
 const leadRoutes = require('./routes/lead');
 const crmLeadsRoutes = require('./routes/crmLeads');
+const pushNotificationRoutes = require('./routes/pushNotification.routes');
 const os = require('os');
 const mongoose = require('mongoose');
 
@@ -110,6 +111,8 @@ app.use('/api/subscription-packages', subscriptionPackageRoutes);
 app.use('/api/super-admin/subscription-packages', superAdminSubscriptionPackageRoutes);
 app.use('/api/lead', leadRoutes);
 app.use('/api/crm-leads', crmLeadsRoutes);
+app.use('/api/push', pushNotificationRoutes);
+
 
 
 // Global JSON 404 Handler

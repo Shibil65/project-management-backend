@@ -3,6 +3,8 @@ const getTenantModel = require('../utils/tenantDb');
 const { fallbackLeaves } = require('../utils/fallbackStore');
 const User = require('../models/User');
 const Attendance = require('../models/Attendance');
+const { createAndDispatchNotification } = require('../services/notificationEvent.service');
+
 const STAFFING_THRESHOLD = 0.7; // Minimum proportion of staff that must be present
 
 async function getLeaves(req, res) {
@@ -135,10 +137,27 @@ async function approveLeave(req, res) {
         request.approvedAt = new Date();
         request.approvedBy = approverId;
         await request.save();
-        // Placeholder notification
-        console.log(`Notification: Leave ${id} approved for ${request.email}`);
-        // Placeholder dashboard update
-        console.log(`Dashboard update for employee ${request.email}`);
+        
+        // Dispatch Push & In-App Notification
+        try {
+          const UserModel = getTenantModel(companyId, 'User');
+          const targetUser = await UserModel.findOne({ email: request.email });
+          const recipientId = targetUser ? targetUser._id : (request.employeeId || request.userId);
+          if (recipientId) {
+            createAndDispatchNotification({
+              companyId,
+              recipientId,
+              actorId: approverId,
+              type: 'leaveUpdate',
+              title: 'Leave Request Updated',
+              message: 'Your leave request has been updated.',
+              route: '/employee/leaves',
+              entityType: 'LeaveRequest',
+              entityId: request._id
+            }).catch(() => {});
+          }
+        } catch (notifErr) {}
+
         return res.status(200).json({ success: true, data: request });
       }
     } catch (err) {
@@ -153,8 +172,6 @@ async function approveLeave(req, res) {
     request.status = 'Approved';
     request.approvedAt = new Date();
     request.approvedBy = approverId;
-    console.log(`Notification: Leave ${id} approved for ${request.email}`);
-    console.log(`Dashboard update for employee ${request.email}`);
     return res.status(200).json({ success: true, data: request });
   }
   return res.status(404).json({ success: false, message: 'Leave request not found.' });
@@ -179,7 +196,27 @@ async function declineLeave(req, res) {
         request.declineReason = reason || '';
         request.declinedBy = declinerId;
         await request.save();
-        console.log(`Notification: Leave ${id} declined for ${request.email}`);
+
+        // Dispatch Push & In-App Notification
+        try {
+          const UserModel = getTenantModel(companyId, 'User');
+          const targetUser = await UserModel.findOne({ email: request.email });
+          const recipientId = targetUser ? targetUser._id : (request.employeeId || request.userId);
+          if (recipientId) {
+            createAndDispatchNotification({
+              companyId,
+              recipientId,
+              actorId: declinerId,
+              type: 'leaveUpdate',
+              title: 'Leave Request Updated',
+              message: 'Your leave request has been updated.',
+              route: '/employee/leaves',
+              entityType: 'LeaveRequest',
+              entityId: request._id
+            }).catch(() => {});
+          }
+        } catch (notifErr) {}
+
         return res.status(200).json({ success: true, data: request });
       }
     } catch (err) {
@@ -195,7 +232,6 @@ async function declineLeave(req, res) {
     request.declinedAt = new Date();
     request.declineReason = reason || '';
     request.declinedBy = declinerId;
-    console.log(`Notification: Leave ${id} declined for ${request.email}`);
     return res.status(200).json({ success: true, data: request });
   }
   return res.status(404).json({ success: false, message: 'Leave request not found.' });

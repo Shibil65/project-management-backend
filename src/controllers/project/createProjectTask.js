@@ -1,4 +1,4 @@
-﻿const { getIsConnected } = require("../../config/db");
+const { getIsConnected } = require("../../config/db");
 const getTenantModel = require("../../utils/tenantDb");
 const { fallbackProjects, fallbackUsers } = require("../../utils/fallbackStore");
 const {
@@ -7,6 +7,8 @@ const {
   normalizeAssignees,
   syncAssignedStaff
 } = require("../../utils/taskAssignment");
+
+const { createAndDispatchNotification } = require("../../services/notificationEvent.service");
 
 async function resolveAssigneeNames(companyId, assignees) {
   const normalized = normalizeAssignees(assignees);
@@ -84,7 +86,32 @@ async function createProjectTask(req, res) {
       project.tasks.push(newTask);
       syncAssignedStaff(project, resolvedAssignees);
       await project.save();
-      return res.status(201).json({ success: true, data: project.tasks[project.tasks.length - 1] });
+
+      const createdTask = project.tasks[project.tasks.length - 1];
+
+      // Dispatch task assigned push notifications to resolved assignees
+      try {
+        const UserModel = getTenantModel(companyId, "User");
+        for (const assignee of resolvedAssignees) {
+          if (!assignee.email) continue;
+          const targetUser = await UserModel.findOne({ email: assignee.email, companyId });
+          if (targetUser && String(targetUser._id) !== String(req.user.id)) {
+            createAndDispatchNotification({
+              companyId,
+              recipientId: targetUser._id,
+              actorId: req.user.id,
+              type: "taskAssigned",
+              title: "New task assigned",
+              message: "You have been assigned a new task.",
+              route: `/employee/tasks/${createdTask._id || createdTask.id || id}`,
+              entityType: "Task",
+              entityId: createdTask._id || createdTask.id
+            }).catch(() => {});
+          }
+        }
+      } catch (notifErr) {}
+
+      return res.status(201).json({ success: true, data: createdTask });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ success: false, message: "Internal server error." });
