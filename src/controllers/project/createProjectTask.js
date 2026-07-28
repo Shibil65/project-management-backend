@@ -92,6 +92,7 @@ async function createProjectTask(req, res) {
       // Dispatch task assigned push notifications to resolved assignees
       try {
         const UserModel = getTenantModel(companyId, "User");
+        const projectTitle = project.name || project.title || "Project";
         for (const assignee of resolvedAssignees) {
           if (!assignee.email) continue;
           const targetUser = await UserModel.findOne({ email: assignee.email, companyId });
@@ -101,15 +102,17 @@ async function createProjectTask(req, res) {
               recipientId: targetUser._id,
               actorId: req.user.id,
               type: "taskAssigned",
-              title: "New task assigned",
-              message: "You have been assigned a new task.",
-              route: `/employee/tasks/${createdTask._id || createdTask.id || id}`,
+              title: `New Task: ${createdTask.title}`,
+              message: `You have been assigned "${createdTask.title}" in ${projectTitle}.`,
+              route: `/employee/tasks`,
               entityType: "Task",
               entityId: createdTask._id || createdTask.id
             }).catch(() => {});
           }
         }
-      } catch (notifErr) {}
+      } catch (notifErr) {
+        console.error('[createProjectTask] Notification dispatch error:', notifErr.message);
+      }
 
       return res.status(201).json({ success: true, data: createdTask });
     } catch (err) {

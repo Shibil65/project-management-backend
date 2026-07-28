@@ -117,13 +117,21 @@ async function registerPush(req, res) {
  */
 async function deregisterPush(req, res) {
   try {
-    const { installationId } = req.body;
-    if (!installationId) {
-      return res.status(400).json({ success: false, message: 'installationId is required.' });
-    }
-
+    const { installationId } = req.body || {};
     const userId = req.user.id;
     const companyId = req.user.companyId;
+
+    if (!installationId) {
+      // If installationId is not passed, disable all active registrations for this user
+      await PushRegistration.updateMany(
+        { userId, companyId, enabled: true },
+        { $set: { enabled: false, permission: 'denied', disabledAt: new Date() } }
+      );
+      return res.status(200).json({
+        success: true,
+        message: 'Push notifications disabled for all devices.'
+      });
+    }
 
     const registration = await PushRegistration.findOne({
       installationId,
@@ -131,14 +139,12 @@ async function deregisterPush(req, res) {
       companyId
     });
 
-    if (!registration) {
-      return res.status(404).json({ success: false, message: 'Registration not found for this account.' });
+    if (registration) {
+      registration.enabled = false;
+      registration.permission = 'denied';
+      registration.disabledAt = new Date();
+      await registration.save();
     }
-
-    registration.enabled = false;
-    registration.permission = 'denied';
-    registration.disabledAt = new Date();
-    await registration.save();
 
     return res.status(200).json({
       success: true,

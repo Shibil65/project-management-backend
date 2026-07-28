@@ -1,4 +1,4 @@
-﻿const { getIsConnected } = require("../../config/db");
+const { getIsConnected } = require("../../config/db");
 const getTenantModel = require("../../utils/tenantDb");
 const { fallbackProjects, fallbackUsers } = require("../../utils/fallbackStore");
 const {
@@ -7,6 +7,7 @@ const {
   normalizeAssignees,
   syncAssignedStaff
 } = require("../../utils/taskAssignment");
+const { createAndDispatchNotification } = require("../../services/notificationEvent.service");
 
 function getEffectiveUser(req) {
   const user = { ...req.user };
@@ -109,6 +110,35 @@ async function updateProjectTask(req, res) {
       if (priority !== undefined) task.priority = priority;
       syncAssignedStaff(project, task.assignees && task.assignees.length ? task.assignees : task.assigneeEmail);
       await project.save();
+
+      // Dispatch push notification to task assignees
+      try {
+        const assigneesList = task.assignees && task.assignees.length ? task.assignees : (task.assigneeEmail ? [{ email: task.assigneeEmail }] : []);
+        if (assigneesList.length > 0) {
+          const UserModel = getTenantModel(companyId, "User");
+          const projectTitle = project.name || project.title || "Project";
+          for (const assignee of assigneesList) {
+            if (!assignee.email) continue;
+            const targetUser = await UserModel.findOne({ email: assignee.email, companyId });
+            if (targetUser && String(targetUser._id) !== String(req.user.id)) {
+              createAndDispatchNotification({
+                companyId,
+                recipientId: targetUser._id,
+                actorId: req.user.id,
+                type: "taskAssigned",
+                title: `Task Update: ${task.title}`,
+                message: `Task "${task.title}" in ${projectTitle} was updated.`,
+                route: `/employee/tasks`,
+                entityType: "Task",
+                entityId: task._id || task.id
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (notifErr) {
+        console.error('[lead updateProjectTask] Notification dispatch error:', notifErr.message);
+      }
+
       return res.status(200).json({ success: true, data: task });
     }
 

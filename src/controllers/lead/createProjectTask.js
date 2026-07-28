@@ -1,4 +1,4 @@
-﻿const { getIsConnected } = require("../../config/db");
+const { getIsConnected } = require("../../config/db");
 const getTenantModel = require("../../utils/tenantDb");
 const { fallbackProjects, fallbackUsers } = require("../../utils/fallbackStore");
 const {
@@ -7,6 +7,7 @@ const {
   normalizeAssignees,
   syncAssignedStaff
 } = require("../../utils/taskAssignment");
+const { createAndDispatchNotification } = require("../../services/notificationEvent.service");
 
 function getEffectiveUser(req) {
   const user = { ...req.user };
@@ -97,7 +98,35 @@ async function createProjectTask(req, res) {
       project.tasks.push(newTask);
       syncAssignedStaff(project, resolvedAssignees);
       await project.save();
-      return res.status(201).json({ success: true, data: project.tasks[project.tasks.length - 1] });
+
+      const createdTask = project.tasks[project.tasks.length - 1];
+
+      // Dispatch task assigned push notifications to resolved assignees
+      try {
+        const UserModel = getTenantModel(companyId, "User");
+        const projectTitle = project.name || project.title || "Project";
+        for (const assignee of resolvedAssignees) {
+          if (!assignee.email) continue;
+          const targetUser = await UserModel.findOne({ email: assignee.email, companyId });
+          if (targetUser && String(targetUser._id) !== String(req.user.id)) {
+            createAndDispatchNotification({
+              companyId,
+              recipientId: targetUser._id,
+              actorId: req.user.id,
+              type: "taskAssigned",
+              title: `New Task: ${createdTask.title}`,
+              message: `You have been assigned "${createdTask.title}" in ${projectTitle}.`,
+              route: `/employee/tasks`,
+              entityType: "Task",
+              entityId: createdTask._id || createdTask.id
+            }).catch(() => {});
+          }
+        }
+      } catch (notifErr) {
+        console.error('[lead createProjectTask] Notification dispatch error:', notifErr.message);
+      }
+
+      return res.status(201).json({ success: true, data: createdTask });
     }
 
     const project = fallbackProjects.find(p => p.id === id && p.companyId === companyId && !p.isDeleted);
