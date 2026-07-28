@@ -392,8 +392,18 @@ async function verifyOtp(req, res) {
   });
 }
 
+async function getSentOtps(req, res) {
+  const { getSentMailLogs } = require('../services/emailService');
+  const logs = getSentMailLogs();
+  return res.status(200).json({
+    success: true,
+    data: logs
+  });
+}
+
 module.exports = {
   sendOtp,
   verifyOtp,
   mailHealth,
+  getSentOtps
 };

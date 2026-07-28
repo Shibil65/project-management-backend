@@ -131,8 +131,8 @@ async function processPortalClosingReminders() {
 
       const minutesRemaining = closeMinutes - currentMinutes;
 
-      // Send reminder if portal closes within 30 minutes
-      if (minutesRemaining > 0 && minutesRemaining <= 30) {
+      // Send reminder 5 minutes before portal closes (e.g., at 5:55 PM for a 6:00 PM closing time)
+      if (minutesRemaining > 0 && minutesRemaining <= 5) {
         const TenantAttendance = getTenantModel(company._id.toString(), 'Attendance');
 
         const checkedInRecords = await TenantAttendance.find({
@@ -160,7 +160,7 @@ async function processPortalClosingReminders() {
             actorId: null,
             type: 'attendanceReminder',
             title: 'Attendance Portal Closing Soon',
-            message: `The attendance portal is closing in ${minutesRemaining} minute(s) at ${formattedCloseTime}. Please check out now!`,
+            message: `The attendance portal will close in ${minutesRemaining} minute(s) at ${formattedCloseTime}. Please check out before it closes!`,
             route: '/employee/attendance',
             entityType: 'Attendance',
             entityId: rec._id,

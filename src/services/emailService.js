@@ -43,6 +43,30 @@ function escapeHtml(value = '') {
     .replace(/'/g, '&#39;');
 }
 
+const sentMailLogs = [];
+
+function recordSentOtpLog({ email, otp, status, provider, error = null }) {
+  const log = {
+    id: `otp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    email,
+    otp,
+    subject: 'Your Flownex verification code',
+    status, // 'sent' | 'fallback_logged' | 'failed'
+    provider: provider || mailConfig.provider || 'smtp',
+    error,
+    sentAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    previewText: `Your Flownex verification code is ${otp}. It expires in 10 minutes. If you did not request this code, ignore this email.`
+  };
+  sentMailLogs.unshift(log);
+  if (sentMailLogs.length > 50) sentMailLogs.pop();
+  return log;
+}
+
+function getSentMailLogs() {
+  return sentMailLogs;
+}
+
 async function sendEmailOtp(email, otp) {
   console.log('[MAIL] OTP send requested:', { to: email, smtp: getSafeSmtpConfig() });
 
@@ -50,13 +74,12 @@ async function sendEmailOtp(email, otp) {
 
   if (!isConfigured) {
     console.error('[MAIL] Email service cannot be sent. Incomplete credentials for provider: ' + mailConfig.provider);
-    if (canUseOtpConsoleFallback()) {
-      return { success: true, message: 'SMTP/API not configured. OTP logged to server console.', debugMockOtp: otp };
-    }
-    const errMsg = mailConfig.provider === 'api' 
-      ? 'BREVO_API_KEY is missing/invalid or EMAIL_PROVIDER is wrong.' 
-      : 'SMTP credentials are invalid.';
-    return { success: false, message: errMsg };
+    recordSentOtpLog({ email, otp, status: 'fallback_logged', provider: mailConfig.provider, error: 'SMTP/API credentials missing' });
+    return {
+      success: true,
+      message: 'SMTP/API not configured. OTP code logged to server console & sent mail viewer.',
+      debugMockOtp: otp
+    };
   }
 
   try {
@@ -70,15 +93,23 @@ async function sendEmailOtp(email, otp) {
       headers: { 'X-Priority': '1', 'Importance': 'high' }
     });
 
-    return { success: true, message: 'OTP has been dispatched to your email address.', debugMockOtp: null };
+    recordSentOtpLog({ email, otp, status: 'sent', provider: mailConfig.provider });
+
+    return {
+      success: true,
+      message: 'OTP has been dispatched to your email address.',
+      debugMockOtp: process.env.NODE_ENV !== 'production' ? otp : null
+    };
   } catch (mailError) {
     const details = getSmtpErrorDetails(mailError);
     console.error('[MAIL] OTP send failed:', details);
     
+    recordSentOtpLog({ email, otp, status: 'failed', provider: mailConfig.provider, error: details.message || 'SMTP delivery error' });
+
     if (canUseOtpConsoleFallback()) {
       return {
         success: true,
-        message: 'Mail server issue. Developer fallback: OTP printed to server console.',
+        message: 'Mail server issue. Developer fallback: OTP printed to server console & sent mail viewer.',
         debugMockOtp: otp
       };
     }
@@ -86,7 +117,8 @@ async function sendEmailOtp(email, otp) {
     return {
       success: false,
       message: getOtpMailFailureMessage(mailError),
-      error: process.env.NODE_ENV === 'production' ? undefined : details
+      error: process.env.NODE_ENV === 'production' ? undefined : details,
+      debugMockOtp: process.env.NODE_ENV !== 'production' ? otp : null
     };
   }
 }
@@ -201,5 +233,6 @@ module.exports = {
   sendEmailOtp,
   sendWelcomeEmail,
   sendEmployeeInviteEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  getSentMailLogs
 };
