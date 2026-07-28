@@ -3,6 +3,8 @@ const getTenantModel = require("../../utils/tenantDb");
 const { fallbackProjects } = require("../../utils/fallbackStore");
 const { isEmailMatch, isTaskAssignedTo } = require("../../utils/taskAssignment");
 
+const { createAndDispatchNotification } = require("../../services/notificationEvent.service");
+
 function isAuthorizedForProject(project, email) {
   const isStaff = project.assignedStaff?.some(staffEmail => isEmailMatch(staffEmail, email));
   const isTaskAssignee = project.tasks?.some(task => isTaskAssignedTo(task, email));
@@ -30,6 +32,29 @@ async function updateProjectComments(req, res) {
 
       project.comments = comments;
       await project.save();
+
+      // Dispatch comment notification to other project staff
+      try {
+        const UserModel = getTenantModel(companyId, "User");
+        const staffEmails = (project.assignedStaff || []).filter(e => !isEmailMatch(e, email));
+        for (const staffEmail of staffEmails) {
+          const targetUser = await UserModel.findOne({ email: staffEmail, companyId });
+          if (targetUser && String(targetUser._id) !== String(req.user.id)) {
+            createAndDispatchNotification({
+              companyId,
+              recipientId: targetUser._id,
+              actorId: req.user.id,
+              type: "taskComment",
+              title: "New comment on project task",
+              message: `${req.user.name || "A team member"} commented on project "${project.title || "Project"}".`,
+              route: `/employee/projects/${project._id}`,
+              entityType: "Project",
+              entityId: project._id
+            }).catch(() => {});
+          }
+        }
+      } catch (notifErr) {}
+
       return res.status(200).json({ success: true, message: "Comments updated.", data: project });
     } else {
       const project = fallbackProjects.find(p => p.id === projectId && p.companyId === companyId);

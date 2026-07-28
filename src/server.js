@@ -137,8 +137,10 @@ async function startServer() {
   });
 
   const { runAllCompaniesAutoCheckout } = require('./utils/attendancePortalWindow');
+  const { runReminderJobs } = require('./jobs/notificationReminder.job');
   setInterval(() => {
     runAllCompaniesAutoCheckout().catch(err => console.error('[Auto-Checkout Poller Error]:', err.message));
+    runReminderJobs().catch(err => console.error('[Reminder Jobs Error]:', err.message));
   }, 60000);
 
   server.on('error', (err) => {
