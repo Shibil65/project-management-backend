@@ -167,19 +167,11 @@ async function sendOtp(req, res) {
     console.warn('[OTP] MongoDB not connected. OTP stored in fallback memory store:', { email: normalizedEmail });
   }
 
-  // Always print the OTP to the server console so it appears in Render server logs
-  console.log('\n=================================================');
-  console.log('🔥 [FLOWNEX OTP DISPATCH LOG]');
-  console.log(`Recipient Email : ${normalizedEmail}`);
-  console.log(`VERIFICATION CODE: ${otp}`);
-  console.log(`Dispatched At   : ${new Date().toISOString()}`);
-  console.log('Expires In      : 10 Minutes');
-  console.log('=================================================\n');
+  console.log('[OTP] Email dispatch completed for:', normalizedEmail);
 
   return res.status(200).json({
-    ...result,
-    debugMockOtp: otp,
-    otpCode: otp
+    success: true,
+    message: result.message
   });
 }
 async function resolveLoginUser(email) {
