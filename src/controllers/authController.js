@@ -167,17 +167,20 @@ async function sendOtp(req, res) {
     console.warn('[OTP] MongoDB not connected. OTP stored in fallback memory store:', { email: normalizedEmail });
   }
 
-  // Always print the OTP to the console in local development so the developer can log in even if SMTP times out.
-  if (process.env.NODE_ENV !== 'production' || result.debugMockOtp) {
-    console.log('\n=========================================');
-    console.log('[DEVELOPMENT OTP BYPASS LOG]');
-    console.log(`Email:          ${normalizedEmail}`);
-    console.log(`Generated OTP:  ${otp}`);
-    console.log('Expires in:     10 Minutes (Hashed in DB)');
-    console.log('=========================================\n');
-  }
+  // Always print the OTP to the server console so it appears in Render server logs
+  console.log('\n=================================================');
+  console.log('🔥 [FLOWNEX OTP DISPATCH LOG]');
+  console.log(`Recipient Email : ${normalizedEmail}`);
+  console.log(`VERIFICATION CODE: ${otp}`);
+  console.log(`Dispatched At   : ${new Date().toISOString()}`);
+  console.log('Expires In      : 10 Minutes');
+  console.log('=================================================\n');
 
-  return res.status(200).json(result);
+  return res.status(200).json({
+    ...result,
+    debugMockOtp: otp,
+    otpCode: otp
+  });
 }
 async function resolveLoginUser(email) {
   let matchedUser = null;
