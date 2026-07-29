@@ -50,6 +50,8 @@ const superAdminSubscriptionPackageRoutes = require('./routes/superAdminSubscrip
 const leadRoutes = require('./routes/lead');
 const crmLeadsRoutes = require('./routes/crmLeads');
 const pushNotificationRoutes = require('./routes/pushNotification.routes');
+const attendanceSettingsRoutes = require('./routes/attendanceSettingsRoutes');
+const officeLocationRoutes = require('./routes/officeLocationRoutes');
 const os = require('os');
 const mongoose = require('mongoose');
 
@@ -96,6 +98,10 @@ app.post('/api/reset-password', employeeResetPassword);
 
 app.use('/api', authRoutes);
 app.use('/api/companies', companyRoutes);
+app.use('/api/company', attendanceSettingsRoutes);
+app.use('/api/company', officeLocationRoutes);
+app.use('/company', attendanceSettingsRoutes);
+app.use('/company', officeLocationRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api', employeeRoutes);
 app.use('/api/attendance', attendanceRoutes);

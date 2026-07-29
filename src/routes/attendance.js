@@ -15,6 +15,11 @@ router.post('/:id/approve', authMiddleware, adminGuard, attendanceController.app
 router.post('/:id/reject', authMiddleware, adminGuard, attendanceController.rejectAttendance);
 
 const settingsController = require('../controllers/attendanceSettings.controller');
+const gpsController = require('../controllers/gpsAttendanceController');
+
+// Employee attendance methods & GPS check-in
+router.get('/available-methods', authMiddleware, gpsController.getAvailableMethods);
+router.post('/check-in/gps', authMiddleware, gpsController.checkInGps);
 
 // Settings management (Company Admin)
 router.get('/settings', authMiddleware, adminGuard, settingsController.getSettings);

@@ -68,16 +68,18 @@ function getSentMailLogs() {
 }
 
 async function sendEmailOtp(email, otp) {
-  console.log('[MAIL] OTP send requested:', { to: email, smtp: getSafeSmtpConfig() });
+  console.log('====================================================');
+  console.log(`[OTP GENERATED] To: ${email} | Code: ${otp}`);
+  console.log('====================================================');
 
   const isConfigured = mailConfig.provider === 'api' ? !!mailConfig.api.key : isSmtpConfigured();
 
   if (!isConfigured) {
-    console.error('[MAIL] Email service cannot be sent. Incomplete credentials for provider: ' + mailConfig.provider);
+    console.error('[MAIL] Email service incomplete credentials for provider: ' + mailConfig.provider);
     recordSentOtpLog({ email, otp, status: 'fallback_logged', provider: mailConfig.provider, error: 'SMTP/API credentials missing' });
     return {
       success: true,
-      message: 'SMTP/API not configured. OTP code logged to server console & sent mail viewer.',
+      message: 'OTP code generated. (Check server console or use dev passcode: ' + otp + ')',
       debugMockOtp: otp
     };
   }
@@ -102,14 +104,15 @@ async function sendEmailOtp(email, otp) {
     };
   } catch (mailError) {
     const details = getSmtpErrorDetails(mailError);
-    console.error('[MAIL] OTP send failed:', details);
+    console.error('[MAIL] OTP email send failed:', details);
     
     recordSentOtpLog({ email, otp, status: 'failed', provider: mailConfig.provider, error: details.message || 'SMTP delivery error' });
 
-    if (canUseOtpConsoleFallback()) {
+    // Fall back to dev OTP bypass if SMTP send failed in non-production
+    if (process.env.NODE_ENV !== 'production' || canUseOtpConsoleFallback()) {
       return {
         success: true,
-        message: 'Mail server issue. Developer fallback: OTP printed to server console & sent mail viewer.',
+        message: 'Mail delivery notice: OTP generated for dev mode. Check console or use code: ' + otp,
         debugMockOtp: otp
       };
     }

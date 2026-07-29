@@ -1,29 +1,39 @@
 require('dotenv').config();
 
 const mailConfig = {
-  provider: (process.env.EMAIL_PROVIDER || 'smtp').trim().toLowerCase(),
+  get provider() {
+    return (process.env.EMAIL_PROVIDER || 'smtp').trim().toLowerCase();
+  },
   
   // SMTP Mode Config
-  smtp: {
-    host: process.env.SMTP_HOST || '',
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
-    fromName: process.env.EMAIL_FROM_NAME || process.env.BRAND_NAME || process.env.SMTP_FROM_NAME || 'Flownex',
-    fromEmail: process.env.SMTP_FROM_EMAIL || ''
+  get smtp() {
+    return {
+      host: process.env.SMTP_HOST || '',
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER || '',
+      pass: process.env.SMTP_PASS || '',
+      fromName: process.env.EMAIL_FROM_NAME || process.env.BRAND_NAME || process.env.SMTP_FROM_NAME || 'Flownex',
+      fromEmail: process.env.SMTP_FROM_EMAIL || ''
+    };
   },
 
   // API Mode Config
-  api: {
-    key: process.env.BREVO_API_KEY || '',
-    senderName: process.env.EMAIL_FROM_NAME || process.env.BRAND_NAME || process.env.BREVO_SENDER_NAME || 'Flownex',
-    senderEmail: process.env.BREVO_SENDER_EMAIL || ''
+  get api() {
+    return {
+      key: process.env.BREVO_API_KEY || '',
+      senderName: process.env.EMAIL_FROM_NAME || process.env.BRAND_NAME || process.env.BREVO_SENDER_NAME || 'Flownex',
+      senderEmail: process.env.BREVO_SENDER_EMAIL || process.env.SMTP_FROM_EMAIL || ''
+    };
   },
 
   // Security Policy
-  allowDevBypass: process.env.ALLOW_DEV_OTP_BYPASS === 'true',
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+  get allowDevBypass() {
+    return process.env.ALLOW_DEV_OTP_BYPASS === 'true';
+  },
+  get frontendUrl() {
+    return process.env.FRONTEND_URL || 'http://localhost:5173';
+  }
 };
 
 function maskSecret(val) {

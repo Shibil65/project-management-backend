@@ -221,9 +221,18 @@ const verifyToken = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: 'You do not belong to this company.' });
   }
 
+  // Check global & QR settings
+  const { getOrCreateCompanySettings } = require('../services/gpsVerificationService');
+  const attendanceService = require('../services/attendanceService');
+  const companySettings = await getOrCreateCompanySettings(companyId, employeeUser.email);
+
+  if (companySettings.attendanceEnabled === false) {
+    return res.status(403).json({ success: false, code: 'ATTENDANCE_DISABLED', message: 'Attendance is currently closed by your company.' });
+  }
+
   const settings = await qrService.getCompanySettings(companyId, employeeUser.email);
-  if (!settings.qrAttendanceEnabled) {
-    return res.status(400).json({ success: false, message: 'QR Attendance is disabled for this company.' });
+  if (!settings.qrAttendanceEnabled && companySettings.methods?.qr?.enabled !== true) {
+    return res.status(403).json({ success: false, code: 'QR_ATTENDANCE_DISABLED', message: 'QR Attendance is currently disabled for this company.' });
   }
 
   const companyDoc = await qrService.getCompanyDoc(companyId);
@@ -288,41 +297,33 @@ const verifyToken = asyncHandler(async (req, res) => {
     });
   }
 
-  const dateNow = new Date();
-  const todayDateCandidates = getAttendanceDateCandidates(dateNow);
-  const todayDateStr = formatAttendanceDate(dateNow);
-  const timeNowStr = formatAttendanceTime(dateNow);
-
-  const existingRecord = await qrService.getTodayAttendanceRecord(companyId, employeeUser.email, todayDateCandidates);
-
   if (action === 'check_in') {
-    if (existingRecord) {
-      return res.status(400).json({ success: false, message: 'You are already checked in today.' });
+    try {
+      const attendanceRecord = await attendanceService.startCheckIn({
+        companyId,
+        employeeId: employeeUser.id,
+        email: employeeUser.email,
+        name: employeeUser.name,
+        org: employeeUser.org,
+        method: 'qr',
+        verification: {
+          qrSessionId: session._id || session.id,
+          deviceInfo: req.headers['user-agent'] || 'Mobile Browser'
+        }
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Attendance Check-In verified successfully via QR.',
+        data: attendanceRecord
+      });
+    } catch (err) {
+      if (err.code === 'ALREADY_CHECKED_IN') {
+        return res.status(400).json({ success: false, code: 'ALREADY_CHECKED_IN', message: 'You are already checked in today.' });
+      }
+      throw err;
     }
-
-    const attendanceRecord = await qrService.createAttendance(companyId, {
-      name: employeeUser.name,
-      email: employeeUser.email,
-      companyId,
-      org: employeeUser.org,
-      date: todayDateStr,
-      checkIn: timeNowStr,
-      checkOut: '',
-      duration: '',
-      status: 'Approved',
-      remarks: 'QR Scan Verified',
-      verificationMethod: 'qr',
-      qrSessionId: session._id || session.id,
-      deviceInfo: req.headers['user-agent'] || 'Mobile Browser'
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: 'Attendance Check-In verified successfully via QR.',
-      data: attendanceRecord
-    });
   } else {
-    // If somehow triggered check_out via verify
     return res.status(400).json({ success: false, message: 'QR verify is restricted to shift check-ins only.' });
   }
 });

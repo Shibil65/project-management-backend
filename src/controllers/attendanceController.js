@@ -136,14 +136,16 @@ async function adminMarkAttendance(req, res) {
     }
   }
 
+  const normalizedEmail = String(employeeEmail || '').trim().toLowerCase();
+
   if (getIsConnected()) {
     try {
       const UserModel = getTenantModel(companyId, 'User');
-      let employee = await UserModel.findOne({ email: employeeEmail.toLowerCase() });
+      let employee = await UserModel.findOne({ email: normalizedEmail });
       if (!employee) {
         try {
           const EmployeeModel = getTenantModel(companyId, 'Employee');
-          employee = await EmployeeModel.findOne({ email: employeeEmail.toLowerCase() });
+          employee = await EmployeeModel.findOne({ email: normalizedEmail });
         } catch (e) {
           console.error('Error checking employee model details in adminMarkAttendance:', e);
         }
@@ -152,13 +154,24 @@ async function adminMarkAttendance(req, res) {
         return res.status(404).json({ success: false, message: 'Employee not found.' });
       }
 
+      const empId = employee._id || employee.id;
+      const empEmail = employee.email.toLowerCase();
+      const dateKey = getAttendanceDateKey(targetDate);
+
       const AttendanceModel = getTenantModel(companyId, 'Attendance');
       let attendanceRecord = await AttendanceModel.findOne({
-        email: employee.email.toLowerCase(),
-        date: { $in: dateCandidates }
+        companyId,
+        $or: [
+          { email: empEmail, date: { $in: dateCandidates } },
+          { employeeId: empId, dateKey }
+        ]
       });
 
       if (attendanceRecord) {
+        attendanceRecord.name = employee.name;
+        attendanceRecord.email = empEmail;
+        attendanceRecord.employeeId = empId;
+        attendanceRecord.dateKey = dateKey;
         if (checkIn) attendanceRecord.checkIn = checkIn;
         if (checkOut !== undefined) {
           attendanceRecord.checkOut = checkOut;
@@ -174,10 +187,12 @@ async function adminMarkAttendance(req, res) {
       } else {
         const newAttendance = new AttendanceModel({
           name: employee.name,
-          email: employee.email,
+          email: empEmail,
+          employeeId: empId,
           companyId,
           org: req.user.org || employee.org || 'Company',
           date: primaryDateStr,
+          dateKey,
           checkIn,
           checkOut: checkOut || '',
           duration,
@@ -196,17 +211,25 @@ async function adminMarkAttendance(req, res) {
   }
 
   const { fallbackUsers } = require('../utils/fallbackStore');
-  const employee = fallbackUsers.find(u => u.email.toLowerCase() === employeeEmail.toLowerCase());
+  const employee = fallbackUsers.find(u => u.email.toLowerCase() === normalizedEmail);
   if (!employee) {
-    return res.status(404).json({ success: false, message: 'Employee not found in fallback store.' });
+    return res.status(404).json({ success: false, message: 'Employee not found.' });
   }
 
+  const empId = employee._id || employee.id || 'emp_fb';
+  const empEmail = employee.email.toLowerCase();
+  const dateKey = getAttendanceDateKey(targetDate);
+
   const existingIndex = fallbackAttendance.findIndex(a => 
-    a.email.toLowerCase() === employee.email.toLowerCase() && 
-    (dateCandidates.includes(a.date) || a.date === date)
+    (a.email.toLowerCase() === empEmail || String(a.employeeId) === String(empId)) && 
+    (dateCandidates.includes(a.date) || a.dateKey === dateKey || a.date === date)
   );
 
   if (existingIndex !== -1) {
+    fallbackAttendance[existingIndex].name = employee.name;
+    fallbackAttendance[existingIndex].email = empEmail;
+    fallbackAttendance[existingIndex].employeeId = empId;
+    fallbackAttendance[existingIndex].dateKey = dateKey;
     if (checkIn) fallbackAttendance[existingIndex].checkIn = checkIn;
     if (checkOut !== undefined) {
       fallbackAttendance[existingIndex].checkOut = checkOut;
@@ -221,7 +244,9 @@ async function adminMarkAttendance(req, res) {
   const newAttendance = {
     id: `fb_att_${Date.now()}`,
     name: employee.name,
-    email: employee.email,
+    email: empEmail,
+    employeeId: empId,
+    dateKey,
     companyId,
     org: req.user.org || employee.org || 'Company',
     date: primaryDateStr,
@@ -232,8 +257,7 @@ async function adminMarkAttendance(req, res) {
     remarks: 'Manually registered by Administrator',
     verificationMethod: 'manual'
   };
-
-  fallbackAttendance.push(newAttendance);
+  fallbackAttendance.unshift(newAttendance);
   return res.status(201).json({ success: true, data: newAttendance });
 }
 
