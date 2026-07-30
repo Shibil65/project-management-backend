@@ -75,6 +75,7 @@ async function markAttendance(req, res) {
     email,
     companyId
   } = req.user;
+  const userEmail = (email || '').toLowerCase().trim();
   if (!action || !["checkIn", "checkOut"].includes(action)) {
     return res.status(400).json({
       success: false,
@@ -219,7 +220,7 @@ async function markAttendance(req, res) {
     if (getIsConnected()) {
       const AttendanceModel = getTenantModel(companyId, "Attendance");
       attendanceRecord = await AttendanceModel.findOne({
-        email,
+        email: userEmail,
         date: { $in: todayDateCandidates }
       });
 
@@ -231,8 +232,8 @@ async function markAttendance(req, res) {
           });
         }
         attendanceRecord = new AttendanceModel({
-          name: employeeUser.name || employeeUser.email || email,
-          email,
+          name: employeeUser.name || employeeUser.email || userEmail,
+          email: userEmail,
           companyId,
           org: employeeUser.org || companyDoc?.name || "Workspace",
           date: todayDateStr,
