@@ -31,7 +31,7 @@ const AttendanceSchema = new mongoose.Schema({
   checkOutIpStatus: { type: String, enum: ['Approved', 'Pending Verification', 'Rejected', ''], default: '' },
   checkOutStatus: { type: String, enum: ['Approved', 'Pending Verification', 'Rejected'], default: 'Approved' },
   verificationMethod: { type: String, enum: ['qr', 'gps', 'manual'], default: 'gps' },
-  verificationMode: { type: String, enum: ['radar', 'local-fallback', 'qr', 'manual', ''], default: '' },
+  verificationMode: { type: String, enum: ['radar', 'local-fallback', 'local', 'qr', 'manual', ''], default: '' },
   officeLocationId: { type: mongoose.Schema.Types.ObjectId, ref: 'OfficeLocation', default: null },
   radarGeofenceId: { type: String, default: '' },
   radarEventIds: { type: [String], default: [] },

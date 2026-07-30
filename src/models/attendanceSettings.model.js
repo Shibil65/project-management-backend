@@ -21,9 +21,9 @@ const AttendanceSettingsSchema = new mongoose.Schema({
     },
     gps: {
       enabled: { type: Boolean, default: false },
-      maximumAcceptedAccuracy: { type: Number, default: 60 },
+      maximumAcceptedAccuracy: { type: Number, default: 100 },
       defaultRadiusMeters: { type: Number, default: 100 },
-      requireRadarVerification: { type: Boolean, default: true },
+      requireRadarVerification: { type: Boolean, default: false },
       allowLocalFallback: { type: Boolean, default: false }
     }
   },

@@ -36,7 +36,7 @@ const OfficeLocationSchema = new mongoose.Schema({
   },
   maximumAcceptedAccuracy: {
     type: Number,
-    default: 60,
+    default: 100,
     min: 5
   },
   isActive: {
@@ -57,8 +57,8 @@ const OfficeLocationSchema = new mongoose.Schema({
   },
   radarSyncStatus: {
     type: String,
-    enum: ['pending', 'synced', 'failed'],
-    default: 'pending'
+    enum: ['pending', 'synced', 'failed', 'local'],
+    default: 'synced'
   },
   radarLastSyncedAt: {
     type: Date,

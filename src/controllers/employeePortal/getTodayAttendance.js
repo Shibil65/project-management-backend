@@ -18,6 +18,7 @@ async function getTodayAttendance(req, res) {
     email,
     companyId
   } = req.user;
+  const userEmail = (email || '').toLowerCase().trim();
   const now = new Date();
   const todayDateCandidates = getAttendanceDateCandidates(now);
   try {
@@ -29,13 +30,13 @@ async function getTodayAttendance(req, res) {
       await processAutoCheckout(companyId, companyDoc, now);
       const AttendanceModel = getTenantModel(companyId, "Attendance");
       record = await AttendanceModel.findOne({
-        email,
+        email: userEmail,
         date: { $in: todayDateCandidates }
       });
     } else {
       companyDoc = fallbackCompanies.find(c => (c.id || c._id) === companyId) || null;
       await processAutoCheckout(companyId, companyDoc, now);
-      record = fallbackAttendance.find(a => a.email === email && todayDateCandidates.includes(a.date)) || null;
+      record = fallbackAttendance.find(a => (a.email || '').toLowerCase().trim() === userEmail && todayDateCandidates.includes(a.date)) || null;
     }
 
     const attendancePortal = getAttendancePortalStatus(companyDoc, now);

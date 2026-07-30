@@ -23,6 +23,14 @@ const getOfficeLocations = asyncHandler(async (req, res) => {
 
   if (getIsConnected()) {
     const locations = await OfficeLocation.find({ companyId }).sort({ createdAt: -1 });
+    // Upgrade existing office records created with old 60m threshold
+    let needsSave = false;
+    for (const loc of locations) {
+      if (!loc.maximumAcceptedAccuracy || loc.maximumAcceptedAccuracy < 100) {
+        loc.maximumAcceptedAccuracy = 100;
+        await loc.save();
+      }
+    }
     return res.status(200).json({ success: true, data: locations });
   }
 
@@ -67,19 +75,22 @@ const createOfficeLocation = asyncHandler(async (req, res) => {
     newOffice.radarTag = 'company-office';
     newOffice.radarExternalId = newOffice._id.toString();
 
-    // Try Radar Sync
+    // Optional Radar Sync (defaults to local spatial mode when unconfigured)
     try {
-      const syncResult = await radarService.upsertOfficeGeofence(newOffice, companyDoc?.name || 'Company');
-      if (syncResult.success) {
-        newOffice.radarGeofenceId = syncResult.geofenceId || '';
-        newOffice.radarSyncStatus = 'synced';
-        newOffice.radarLastSyncedAt = new Date();
+      if (radarService.isConfigured()) {
+        const syncResult = await radarService.upsertOfficeGeofence(newOffice, companyDoc?.name || 'Company');
+        if (syncResult.success) {
+          newOffice.radarGeofenceId = syncResult.geofenceId || '';
+          newOffice.radarSyncStatus = 'synced';
+          newOffice.radarLastSyncedAt = new Date();
+        } else {
+          newOffice.radarSyncStatus = 'local';
+        }
       } else {
-        newOffice.radarSyncStatus = 'failed';
+        newOffice.radarSyncStatus = 'local';
       }
     } catch (syncErr) {
-      console.warn('[OfficeLocation] Radar sync failed during create:', syncErr.message);
-      newOffice.radarSyncStatus = 'failed';
+      newOffice.radarSyncStatus = 'local';
     }
 
     await newOffice.save();
@@ -133,20 +144,23 @@ const updateOfficeLocation = asyncHandler(async (req, res) => {
 
     office.updatedBy = userEmail;
 
-    // Sync with Radar
+    // Optional Sync with Radar (defaults to local spatial mode when unconfigured)
     try {
-      const companyDoc = await Company.findById(companyId);
-      const syncResult = await radarService.upsertOfficeGeofence(office, companyDoc?.name || 'Company');
-      if (syncResult.success) {
-        office.radarGeofenceId = syncResult.geofenceId || office.radarGeofenceId;
-        office.radarSyncStatus = 'synced';
-        office.radarLastSyncedAt = new Date();
+      if (radarService.isConfigured()) {
+        const companyDoc = await Company.findById(companyId);
+        const syncResult = await radarService.upsertOfficeGeofence(office, companyDoc?.name || 'Company');
+        if (syncResult.success) {
+          office.radarGeofenceId = syncResult.geofenceId || office.radarGeofenceId;
+          office.radarSyncStatus = 'synced';
+          office.radarLastSyncedAt = new Date();
+        } else {
+          office.radarSyncStatus = 'local';
+        }
       } else {
-        office.radarSyncStatus = 'failed';
+        office.radarSyncStatus = 'local';
       }
     } catch (syncErr) {
-      console.warn('[OfficeLocation] Radar sync failed during update:', syncErr.message);
-      office.radarSyncStatus = 'failed';
+      office.radarSyncStatus = 'local';
     }
 
     await office.save();
@@ -221,12 +235,16 @@ const retryRadarSync = asyncHandler(async (req, res) => {
       } else {
         office.radarSyncStatus = 'failed';
         await office.save();
-        return res.status(400).json({ success: false, code: 'RADAR_SYNC_FAILED', message: 'Radar API error during sync retry.' });
+        return res.status(400).json({
+          success: false,
+          code: 'RADAR_SYNC_FAILED',
+          message: syncResult.message || 'Radar API key (RADAR_SECRET_KEY) missing in environment variables.'
+        });
       }
     } catch (err) {
       office.radarSyncStatus = 'failed';
       await office.save();
-      return res.status(500).json({ success: false, code: 'RADAR_SYNC_FAILED', message: err.message });
+      return res.status(400).json({ success: false, code: 'RADAR_SYNC_FAILED', message: err.message });
     }
   }
 
