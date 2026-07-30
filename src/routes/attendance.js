@@ -20,4 +20,13 @@ const settingsController = require('../controllers/attendanceSettings.controller
 router.get('/settings', authMiddleware, adminGuard, settingsController.getSettings);
 router.patch('/settings', authMiddleware, adminGuard, settingsController.updateSettings);
 
+const gpsController = require('../controllers/gpsAttendance.controller');
+const { verifyAppCheck } = require('../middlewares/appCheck.middleware');
+
+// Available attendance methods (Employee/Admin)
+router.get('/available-methods', authMiddleware, gpsController.getAvailableMethods);
+
+// Employee GPS Check-In
+router.post('/check-in/gps', authMiddleware, verifyAppCheck, gpsController.checkInGps);
+
 module.exports = router;

@@ -129,9 +129,23 @@ async function startServer() {
   await initializeDatabase();
   await initializeMail();
 
-  const server = app.listen(PORT, () => {
+  const os = require('os');
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    const interfaces = os.networkInterfaces();
+    let wifiIp = 'localhost';
+    for (const devName in interfaces) {
+      const iface = interfaces[devName];
+      for (let i = 0; i < iface.length; i++) {
+        const alias = iface[i];
+        if (alias.family === 'IPv4' && !alias.internal) {
+          wifiIp = alias.address;
+        }
+      }
+    }
+
     console.log('=========================================');
     console.log(`Flownex backend listening on port ${PORT}`);
+    console.log(`Local Wi-Fi Access URL: http://${wifiIp}:${PORT}`);
     console.log('Clean Architecture (src/) loaded successfully.');
     console.log('=========================================');
   });

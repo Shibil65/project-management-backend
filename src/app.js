@@ -50,7 +50,11 @@ const superAdminSubscriptionPackageRoutes = require('./routes/superAdminSubscrip
 const leadRoutes = require('./routes/lead');
 const crmLeadsRoutes = require('./routes/crmLeads');
 const pushNotificationRoutes = require('./routes/pushNotification.routes');
+const officeLocationRoutes = require('./routes/officeLocation.routes');
 const os = require('os');
+
+// ...
+app.use('/api/company/office-locations', officeLocationRoutes);
 const mongoose = require('mongoose');
 
 app.get('/api/system/metrics', (req, res) => {
