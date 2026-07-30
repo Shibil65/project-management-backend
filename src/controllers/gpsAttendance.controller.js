@@ -393,7 +393,181 @@ const checkInGps = asyncHandler(async (req, res) => {
   return res.status(201).json({ success: true, data: record });
 });
 
+// Helper for duration
+function calculateDurationHelper(checkInStr, checkOutStr) {
+  try {
+    const parseTime = timeStr => {
+      const parts = String(timeStr).replace(/\s+/g, " ").trim().split(" ");
+      const time = parts[0];
+      const modifier = parts[1] ? parts[1].toUpperCase() : "";
+      let [hours, minutes, seconds] = time.split(":").map(Number);
+      if (modifier === "PM" && hours < 12) hours += 12;
+      if (modifier === "AM" && hours === 12) hours = 0;
+      return new Date(2000, 0, 1, hours, minutes, seconds || 0);
+    };
+    const inDate = parseTime(checkInStr);
+    const outDate = parseTime(checkOutStr);
+    const diffMs = outDate - inDate;
+    if (diffMs <= 0) return "0h 0m";
+    const diffMins = Math.floor(diffMs / 1000 / 60);
+    const hrs = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    return `${hrs}h ${mins}m`;
+  } catch {
+    return "0h 0m";
+  }
+}
+
+// 3. POST /api/attendance/check-out/gps
+const checkOutGps = asyncHandler(async (req, res) => {
+  const companyId = req.user.companyId;
+  const userEmail = req.user.email;
+  const userId = req.user.id || req.user._id;
+
+  const {
+    latitude,
+    longitude,
+    accuracy,
+    capturedAt,
+    pwaInstallationId
+  } = req.body;
+
+  if (latitude === undefined || longitude === undefined || accuracy === undefined) {
+    return res.status(400).json({
+      success: false,
+      code: 'INVALID_LOCATION',
+      message: 'Latitude, longitude, and accuracy are required.'
+    });
+  }
+
+  const latNum = Number(latitude);
+  const lonNum = Number(longitude);
+  const accNum = Number(accuracy);
+
+  let settings = null;
+  let activeOffices = [];
+
+  if (getIsConnected()) {
+    settings = await AttendanceSettings.findOne({ companyId });
+    activeOffices = await OfficeLocation.find({ companyId, isActive: true });
+  } else {
+    settings = fallbackAttendanceSettings.find(s => s.companyId === companyId.toString());
+    activeOffices = fallbackOfficeLocations.filter(l => l.companyId === companyId.toString() && l.isActive);
+  }
+
+  if (activeOffices.length === 0) {
+    return res.status(400).json({
+      success: false,
+      code: 'NO_ACTIVE_OFFICE',
+      message: 'No active office locations configured for your company.'
+    });
+  }
+
+  let closestOffice = null;
+  let minDistance = Infinity;
+
+  for (const office of activeOffices) {
+    const officeLon = office.location.coordinates[0];
+    const officeLat = office.location.coordinates[1];
+
+    const dist = calculateHaversineDistance(latNum, lonNum, officeLat, officeLon);
+    if (dist < minDistance) {
+      minDistance = dist;
+      closestOffice = office;
+    }
+  }
+
+  const maxAcceptedAcc = Math.max(
+    Number(closestOffice?.maximumAcceptedAccuracy) || 100,
+    Number(settings?.methods?.gps?.maximumAcceptedAccuracy) || 100,
+    100
+  );
+  const accuracyEval = evaluateGpsAccuracy(accNum, maxAcceptedAcc);
+  if (!accuracyEval.valid) {
+    return res.status(400).json({
+      success: false,
+      code: accuracyEval.code,
+      message: accuracyEval.message
+    });
+  }
+
+  const officeRadius = closestOffice.radiusMeters || 100;
+  const boundaryCheck = evaluateBoundary(minDistance, officeRadius, accNum);
+
+  if (!boundaryCheck.inside && !boundaryCheck.nearBoundary) {
+    return res.status(400).json({
+      success: false,
+      code: 'OUTSIDE_OFFICE_RADIUS',
+      message: `You are outside the permitted office radius for ${closestOffice.name}.`,
+      debug: {
+        closestOfficeName: closestOffice.name,
+        calculatedDistance: minDistance,
+        permittedRadius: officeRadius,
+        gpsAccuracy: accNum
+      }
+    });
+  }
+
+  const now = new Date();
+  const timeStr = formatAttendanceTime(now);
+  const dateCandidates = getAttendanceDateCandidates(now);
+
+  if (getIsConnected()) {
+    const AttendanceModel = getTenantModel(companyId, 'Attendance');
+    let existingRecord = await AttendanceModel.findOne({
+      email: userEmail.toLowerCase().trim(),
+      date: { $in: dateCandidates }
+    });
+
+    if (!existingRecord || !existingRecord.checkIn || existingRecord.checkIn === '-') {
+      return res.status(400).json({
+        success: false,
+        code: 'NO_CHECK_IN_RECORD',
+        message: 'No active check-in record found for today.'
+      });
+    }
+
+    if (existingRecord.checkOut && existingRecord.checkOut !== '-') {
+      return res.status(400).json({
+        success: false,
+        code: 'ALREADY_CHECKED_OUT',
+        message: 'You have already checked out for today.'
+      });
+    }
+
+    existingRecord.checkOut = timeStr;
+    existingRecord.duration = calculateDurationHelper(existingRecord.checkIn, timeStr);
+    existingRecord.checkOutLatitude = latNum;
+    existingRecord.checkOutLongitude = lonNum;
+    existingRecord.checkOutAccuracy = accNum;
+    existingRecord.checkOutDistance = minDistance;
+
+    await existingRecord.save();
+    return res.status(200).json({ success: true, data: existingRecord, message: 'GPS Check-out successful.' });
+  }
+
+  // Fallback Mode
+  const existingIdx = fallbackAttendance.findIndex(a => a.email.toLowerCase() === userEmail.toLowerCase() && dateCandidates.includes(a.date));
+  if (existingIdx === -1 || !fallbackAttendance[existingIdx].checkIn) {
+    return res.status(400).json({
+      success: false,
+      code: 'NO_CHECK_IN_RECORD',
+      message: 'No active check-in record found for today.'
+    });
+  }
+
+  fallbackAttendance[existingIdx].checkOut = timeStr;
+  fallbackAttendance[existingIdx].duration = calculateDurationHelper(fallbackAttendance[existingIdx].checkIn, timeStr);
+  fallbackAttendance[existingIdx].checkOutLatitude = latNum;
+  fallbackAttendance[existingIdx].checkOutLongitude = lonNum;
+  fallbackAttendance[existingIdx].checkOutAccuracy = accNum;
+  fallbackAttendance[existingIdx].checkOutDistance = minDistance;
+
+  return res.status(200).json({ success: true, data: fallbackAttendance[existingIdx], message: 'GPS Check-out successful.' });
+});
+
 module.exports = {
   getAvailableMethods,
-  checkInGps
+  checkInGps,
+  checkOutGps
 };

@@ -26,7 +26,8 @@ const { verifyAppCheck } = require('../middlewares/appCheck.middleware');
 // Available attendance methods (Employee/Admin)
 router.get('/available-methods', authMiddleware, gpsController.getAvailableMethods);
 
-// Employee GPS Check-In
+// Employee GPS Check-In & Check-Out
 router.post('/check-in/gps', authMiddleware, verifyAppCheck, gpsController.checkInGps);
+router.post('/check-out/gps', authMiddleware, verifyAppCheck, gpsController.checkOutGps);
 
 module.exports = router;

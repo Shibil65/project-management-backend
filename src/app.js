@@ -92,11 +92,20 @@ app.get('/api/system/metrics', (req, res) => {
 
 const { employeeForgotPassword, employeeResetPassword } = require('./controllers/employeePortal/forgotPassword');
 
-// Direct alias routes for forgot/reset password
+// Direct alias routes for forgot/reset password & GPS Attendance
 app.post('/api/employee-portal/forgot-password', employeeForgotPassword);
 app.post('/api/employee-portal/reset-password', employeeResetPassword);
 app.post('/api/forgot-password', employeeForgotPassword);
 app.post('/api/reset-password', employeeResetPassword);
+
+const gpsController = require('./controllers/gpsAttendance.controller');
+const authMiddleware = require('./middlewares/auth');
+const { verifyAppCheck } = require('./middlewares/appCheck.middleware');
+
+app.post('/api/attendance/check-in/gps', authMiddleware, verifyAppCheck, gpsController.checkInGps);
+app.post('/api/attendance/check-out/gps', authMiddleware, verifyAppCheck, gpsController.checkOutGps);
+app.post('/api/employee-portal/attendance/check-in/gps', authMiddleware, verifyAppCheck, gpsController.checkInGps);
+app.post('/api/employee-portal/attendance/check-out/gps', authMiddleware, verifyAppCheck, gpsController.checkOutGps);
 
 app.use('/api', authRoutes);
 app.use('/api/companies', companyRoutes);
