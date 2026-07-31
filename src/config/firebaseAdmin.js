@@ -31,7 +31,10 @@ function initializeFirebaseAdmin() {
     const admin = require('firebase-admin');
     
     if (!admin.apps.length) {
-      const privateKey = rawPrivateKey.replace(/\\n/g, '\n');
+      let privateKey = rawPrivateKey;
+      if (typeof privateKey === 'string') {
+        privateKey = privateKey.trim().replace(/^"/, '').replace(/"$/, '').replace(/\\n/g, '\n');
+      }
       
       firebaseAdmin = admin.initializeApp({
         credential: admin.credential.cert({
